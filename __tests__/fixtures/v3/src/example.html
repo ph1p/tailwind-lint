@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tailwind Linter Test</title>
+</head>
+<body>
+  <!-- CSS Conflicts - same properties applied -->
+  <div class="p-4 px-8">Conflicting padding classes</div>
+
+  <!-- More CSS conflicts -->
+  <div class="text-red-500 text-blue-500">Conflicting text colors</div>
+
+  <!-- Recommended variant order -->
+  <div class="focus:hover:text-red-500">Wrong variant order</div>
+
+  <!-- This should be fine -->
+  <div class="hover:focus:text-blue-500">Correct variant order</div>
+
+  <!-- Using arbitrary values -->
+  <div class="text-[14px] p-[16px]">Custom values</div>
+
+  <!-- Multiple conflicts -->
+  <button class="mt-4 mx-2 m-0 text-sm text-lg">
+    Multiple issues
+  </button>
+</body>
+</html>

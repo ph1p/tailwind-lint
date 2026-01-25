@@ -1,0 +1,8 @@
+{
+	"name": "tailwind-cli-test-v4",
+	"version": "1.0.0",
+	"type": "module",
+	"devDependencies": {
+		"tailwindcss": "^4.1.18"
+	}
+}

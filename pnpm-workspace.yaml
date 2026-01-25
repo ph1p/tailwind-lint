@@ -1,0 +1,6 @@
+packages:
+  - __tests__/fixtures/v3
+  - __tests__/fixtures/v4
+
+onlyBuiltDependencies:
+  - esbuild

@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Invalid @apply */
+.custom-class {
+	@apply container;
+}
+
+/* Invalid screen reference */
+@screen tablets {
+	.test {
+		color: red;
+	}
+}
+
+/* Valid screen */
+@screen sm {
+	.valid {
+		color: blue;
+	}
+}
+
+/* Invalid config path */
+.test {
+	color: theme("colors.nonexistent.500");
+}

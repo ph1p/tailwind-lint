@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arbitrary Values Test</title>
+</head>
+<body>
+  <!-- Arbitrary values that should have canonical equivalents -->
+  <div class="top-[60px]">60px = 3.75rem, should suggest top-15</div>
+  <div class="z-[100]">Should suggest z-100</div>
+  <div class="h-[500px]">No canonical equivalent</div>
+  <div class="w-[200px]">200px = 12.5rem, should suggest w-50</div>
+  <div class="min-h-[100vh]">Should suggest min-h-screen</div>
+  <div class="max-w-[1280px]">1280px = 80rem, should suggest max-w-screen-xl</div>
+  <div class="p-[16px]">16px = 1rem, should suggest p-4</div>
+  <div class="m-[32px]">32px = 2rem, should suggest m-8</div>
+  <div class="text-[14px]">14px = 0.875rem, no standard equivalent</div>
+  <div class="gap-[8px]">8px = 0.5rem, should suggest gap-2</div>
+  <div class="left-[3.75rem]">Should suggest left-15</div>
+  <div class="right-[2rem]">Should suggest right-8</div>
+  <div class="bottom-[4rem]">Should suggest bottom-16</div>
+
+  <!-- Test with other size utilities -->
+  <div class="space-x-[0.5rem]">Should suggest space-x-2</div>
+  <div class="inset-[1rem]">Should suggest inset-4</div>
+</body>
+</html>

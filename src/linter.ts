@@ -1,0 +1,433 @@
+import * as path from "node:path";
+import type { State } from "@tailwindcss/language-service";
+import { doValidate } from "@tailwindcss/language-service";
+import glob from "fast-glob";
+import { TextDocument } from "vscode-languageserver-textdocument";
+import { applyCodeActions } from "./code-actions";
+import { DEFAULT_IGNORE_PATTERNS } from "./constants";
+import { createState } from "./state";
+import type {
+	LintFileResult,
+	LintOptions,
+	LintResult,
+	SerializedDiagnostic,
+	TailwindConfig,
+} from "./types";
+
+function fileExists(filePath: string): boolean {
+	try {
+		return require("node:fs").existsSync(filePath);
+	} catch {
+		return false;
+	}
+}
+
+function readFileSync(filePath: string): string {
+	if (!filePath || typeof filePath !== "string") {
+		throw new TypeError("File path must be a non-empty string");
+	}
+	return require("node:fs").readFileSync(filePath, "utf-8");
+}
+
+function writeFileSync(filePath: string, content: string): void {
+	if (!filePath || typeof filePath !== "string") {
+		throw new TypeError("File path must be a non-empty string");
+	}
+	if (typeof content !== "string") {
+		throw new TypeError("Content must be a string");
+	}
+	require("node:fs").writeFileSync(filePath, content, "utf-8");
+}
+
+function serializeDiagnostics(
+	diagnostics: import("vscode-languageserver").Diagnostic[],
+): SerializedDiagnostic[] {
+	return diagnostics.map((diagnostic) => ({
+		range: {
+			start: {
+				line: diagnostic.range.start.line,
+				character: diagnostic.range.start.character,
+			},
+			end: {
+				line: diagnostic.range.end.line,
+				character: diagnostic.range.end.character,
+			},
+		},
+		severity: diagnostic.severity || 2,
+		message: diagnostic.message,
+		code: diagnostic.code?.toString(),
+		source: diagnostic.source,
+	}));
+}
+
+function getLanguageId(filePath: string): string {
+	const LANGUAGE_MAP: Record<string, string> = {
+		".astro": "astro",
+		".css": "css",
+		".erb": "erb",
+		".hbs": "handlebars",
+		".htm": "html",
+		".html": "html",
+		".js": "javascript",
+		".jsx": "javascriptreact",
+		".less": "less",
+		".md": "markdown",
+		".mdx": "mdx",
+		".php": "php",
+		".sass": "sass",
+		".scss": "scss",
+		".svelte": "svelte",
+		".ts": "typescript",
+		".tsx": "typescriptreact",
+		".twig": "twig",
+		".vue": "vue",
+	};
+	const ext = path.extname(filePath).toLowerCase();
+	return LANGUAGE_MAP[ext] || "html";
+}
+
+async function validateDocument(
+	state: State,
+	filePath: string,
+	content: string,
+): Promise<SerializedDiagnostic[]> {
+	try {
+		if (!state) {
+			throw new Error("State is not initialized");
+		}
+
+		if (state.v4 && !state.designSystem) {
+			throw new Error(
+				"Design system not initialized for Tailwind v4. This might indicate a configuration issue.",
+			);
+		}
+
+		if (!state.v4 && !state.modules?.tailwindcss) {
+			throw new Error(
+				"Tailwind modules not initialized for Tailwind v3. This might indicate a configuration issue.",
+			);
+		}
+
+		const languageId = getLanguageId(filePath);
+		const uri = `file://${filePath}`;
+		const document = TextDocument.create(uri, languageId, 1, content);
+
+		const diagnostics = await doValidate(state, document);
+
+		return serializeDiagnostics(diagnostics);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Failed to validate document ${filePath}: ${message}`);
+	}
+}
+
+async function findTailwindConfigPath(
+	cwd: string,
+	configPath?: string,
+): Promise<string | null> {
+	const { V3_CONFIG_PATHS, V4_CSS_FOLDERS, V4_CSS_NAMES } = await import(
+		"./constants"
+	);
+
+	if (configPath) {
+		const resolved = path.isAbsolute(configPath)
+			? configPath
+			: path.resolve(cwd, configPath);
+		return fileExists(resolved) ? resolved : null;
+	}
+
+	for (const p of V3_CONFIG_PATHS) {
+		const fullPath = path.join(cwd, p);
+		if (fileExists(fullPath)) {
+			return fullPath;
+		}
+	}
+
+	const v4Paths = V4_CSS_FOLDERS.flatMap((folder) =>
+		V4_CSS_NAMES.map((name) => path.join(folder, name)),
+	);
+
+	for (const p of v4Paths) {
+		const fullPath = path.join(cwd, p);
+		if (fileExists(fullPath)) {
+			try {
+				const content = readFileSync(fullPath);
+				if (
+					content.includes('@import "tailwindcss"') ||
+					content.includes("@import 'tailwindcss'")
+				) {
+					return fullPath;
+				}
+			} catch {}
+		}
+	}
+
+	return null;
+}
+
+function isCssConfigFile(filePath: string): boolean {
+	return filePath.endsWith(".css");
+}
+
+async function loadTailwindConfig(configPath: string): Promise<TailwindConfig> {
+	if (isCssConfigFile(configPath)) {
+		return {};
+	}
+
+	if (!path.isAbsolute(configPath)) {
+		throw new Error(
+			`Config path must be absolute for security reasons: ${configPath}`,
+		);
+	}
+
+	try {
+		const { createRequire } = await import("node:module");
+		const require = createRequire(import.meta.url || __filename);
+		delete require.cache[configPath];
+
+		const configModule = require(configPath) as
+			| TailwindConfig
+			| { default: TailwindConfig };
+		const config = (
+			"default" in configModule ? configModule.default : configModule
+		) as TailwindConfig;
+
+		if (typeof config !== "object" || config === null) {
+			throw new Error("Config must be an object");
+		}
+
+		return config;
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		throw new Error(
+			`Failed to load config from ${configPath}: ${errorMessage}`,
+		);
+	}
+}
+
+async function discoverFiles(
+	cwd: string,
+	patterns: string[],
+	configPath: string | undefined,
+	autoDiscover: boolean,
+): Promise<string[]> {
+	if (autoDiscover) {
+		return discoverFilesFromConfig(cwd, configPath);
+	}
+	return expandPatterns(cwd, patterns);
+}
+
+async function expandPatterns(
+	cwd: string,
+	patterns: string[],
+): Promise<string[]> {
+	const explicitFiles: string[] = [];
+	const globPatterns: string[] = [];
+
+	for (const pattern of patterns) {
+		if (
+			pattern.includes("*") ||
+			pattern.includes("?") ||
+			pattern.includes("[")
+		) {
+			globPatterns.push(pattern);
+		} else {
+			const fullPath = path.resolve(cwd, pattern);
+			if (fileExists(fullPath)) {
+				explicitFiles.push(pattern);
+			}
+		}
+	}
+
+	if (globPatterns.length === 0) {
+		return explicitFiles;
+	}
+
+	const globResults = await glob(globPatterns, {
+		cwd,
+		absolute: false,
+		ignore: DEFAULT_IGNORE_PATTERNS,
+	});
+
+	if (explicitFiles.length === 0) {
+		return globResults;
+	}
+
+	const fileSet = new Set(explicitFiles);
+	for (const file of globResults) {
+		fileSet.add(file);
+	}
+	return Array.from(fileSet);
+}
+
+async function discoverFilesFromConfig(
+	cwd: string,
+	configPath?: string,
+): Promise<string[]> {
+	const configFilePath = await findTailwindConfigPath(cwd, configPath);
+
+	if (!configFilePath) {
+		throw new Error("Could not find Tailwind config");
+	}
+
+	if (!isCssConfigFile(configFilePath)) {
+		const config = await loadTailwindConfig(configFilePath);
+
+		if (!config || !config.content) {
+			throw new Error(
+				"Could not find Tailwind config or config has no content property",
+			);
+		}
+
+		const patterns = extractContentPatterns(config);
+
+		if (patterns.length === 0) {
+			throw new Error("No content patterns found in Tailwind config");
+		}
+
+		return expandPatterns(cwd, patterns);
+	}
+
+	throw new Error(
+		"Auto-discovery is not supported for CSS-based configs (v4). Please specify file patterns.",
+	);
+}
+
+function extractContentPatterns(config: TailwindConfig): string[] {
+	if (!config.content) return [];
+
+	if (Array.isArray(config.content)) {
+		return config.content.filter((p): p is string => typeof p === "string");
+	}
+
+	if (config.content.files) {
+		return config.content.files.filter(
+			(p): p is string => typeof p === "string",
+		);
+	}
+
+	return [];
+}
+
+async function processFiles(
+	state: State,
+	cwd: string,
+	files: string[],
+	fix: boolean,
+	onProgress?: (current: number, total: number, file: string) => void,
+): Promise<LintFileResult[]> {
+	const results: LintFileResult[] = [];
+
+	for (let i = 0; i < files.length; i++) {
+		if (onProgress) {
+			onProgress(i + 1, files.length, files[i]);
+		}
+
+		const result = await processFile(state, cwd, files[i], fix);
+		if (result) {
+			results.push(result);
+		}
+	}
+
+	return results;
+}
+
+async function processFile(
+	state: State,
+	cwd: string,
+	filePath: string,
+	fix: boolean,
+): Promise<LintFileResult | null> {
+	const absolutePath = path.isAbsolute(filePath)
+		? filePath
+		: path.resolve(cwd, filePath);
+
+	if (!fileExists(absolutePath)) {
+		return null;
+	}
+
+	let content = readFileSync(absolutePath);
+	let diagnostics = await validateDocument(state, absolutePath, content);
+
+	let fixedCount = 0;
+	let wasFixed = false;
+
+	if (fix && diagnostics.length > 0) {
+		const fixResult = await applyCodeActions(
+			state,
+			absolutePath,
+			content,
+			diagnostics,
+		);
+
+		if (fixResult.changed) {
+			writeFileSync(absolutePath, fixResult.content);
+			content = fixResult.content;
+			wasFixed = true;
+			fixedCount = fixResult.fixedCount;
+
+			// Re-validate to get remaining diagnostics
+			diagnostics = await validateDocument(state, absolutePath, content);
+		}
+	}
+
+	return {
+		path: path.relative(cwd, absolutePath),
+		diagnostics,
+		fixed: wasFixed,
+		fixedCount,
+	};
+}
+async function initializeState(
+	cwd: string,
+	configPath?: string,
+	verbose = false,
+) {
+	try {
+		if (verbose) {
+			console.log("→ Initializing Tailwind CSS language service...");
+		}
+		const state = await createState(cwd, configPath, verbose);
+		if (verbose) {
+			console.log("  ✓ State initialized successfully\n");
+		}
+		return state;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Failed to initialize Tailwind state: ${message}`);
+	}
+}
+
+export type { LintFileResult, LintOptions, LintResult };
+
+export async function lint({
+	cwd,
+	patterns,
+	configPath,
+	autoDiscover,
+	fix = false,
+	verbose = false,
+	onProgress,
+}: LintOptions): Promise<LintResult> {
+	const files = await discoverFiles(cwd, patterns, configPath, autoDiscover);
+
+	if (verbose) {
+		console.log(
+			`→ Discovered ${files.length} file${files.length !== 1 ? "s" : ""} to lint`,
+		);
+	}
+
+	if (files.length === 0) {
+		return { files: [], totalFilesProcessed: 0 };
+	}
+
+	const state = await initializeState(cwd, configPath, verbose);
+	const results = await processFiles(state, cwd, files, fix, onProgress);
+
+	return {
+		files: results.filter(
+			(result) => result.diagnostics.length > 0 || result.fixed,
+		),
+		totalFilesProcessed: files.length,
+	};
+}
