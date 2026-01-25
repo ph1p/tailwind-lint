@@ -80,7 +80,6 @@ function truncateFilename(filename: string): string {
 async function displayResults(
 	files: LintFileResult[],
 	fixMode: boolean,
-	verbose: boolean,
 ): Promise<void> {
 	let totalErrors = 0;
 	let totalWarnings = 0;
@@ -90,10 +89,10 @@ async function displayResults(
 
 	for (const file of files) {
 		if (file.diagnostics.length > 0 || (fixMode && file.fixed)) {
-			if (isFirstFile && verbose) {
+			if (isFirstFile) {
 				console.log();
 				isFirstFile = false;
-			} else if (!isFirstFile) {
+			} else {
 				console.log();
 			}
 			console.log(chalk.underline.bold(file.path));
@@ -296,26 +295,20 @@ ${chalk.bold.cyan("Notes:")}
 			});
 
 			if (process.stdout.isTTY && !resolved.verbose) {
-				process.stdout.write("\r\x1b[K");
+				process.stdout.write("\n");
 			}
 
 			if (results.totalFilesProcessed === 0) {
-				if (resolved.verbose) {
-					console.log();
-				}
 				console.log(chalk.yellow("No files found to lint."));
 				process.exit(0);
 			}
 
 			if (results.files.length === 0) {
-				if (resolved.verbose) {
-					console.log();
-				}
 				console.log(chalk.green.bold("✔ No issues found"));
 				process.exit(0);
 			}
 
-			await displayResults(results.files, resolved.fix, resolved.verbose);
+			await displayResults(results.files, resolved.fix);
 
 			const hasErrors = results.files.some((file) =>
 				file.diagnostics.some((d) => d.severity === 1),

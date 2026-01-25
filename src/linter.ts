@@ -4,7 +4,11 @@ import { doValidate } from "@tailwindcss/language-service";
 import glob from "fast-glob";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
-import { DEFAULT_IGNORE_PATTERNS, getLanguageId } from "./constants";
+import {
+	CONCURRENT_FILES,
+	DEFAULT_IGNORE_PATTERNS,
+	getLanguageId,
+} from "./constants";
 import { createState } from "./state";
 import type {
 	LintFileResult,
@@ -311,14 +315,25 @@ async function processFiles(
 ): Promise<LintFileResult[]> {
 	const results: LintFileResult[] = [];
 
-	for (let i = 0; i < files.length; i++) {
-		if (onProgress) {
-			onProgress(i + 1, files.length, files[i]);
-		}
+	for (let i = 0; i < files.length; i += CONCURRENT_FILES) {
+		const batch = files.slice(i, i + CONCURRENT_FILES);
 
-		const result = await processFile(state, cwd, files[i], fix);
-		if (result) {
-			results.push(result);
+		const batchPromises = batch.map(async (file, batchIndex) => {
+			const fileIndex = i + batchIndex;
+			if (onProgress) {
+				onProgress(fileIndex + 1, files.length, file);
+			}
+
+			const result = await processFile(state, cwd, file, fix);
+			return result;
+		});
+
+		const batchResults = await Promise.all(batchPromises);
+
+		for (const result of batchResults) {
+			if (result) {
+				results.push(result);
+			}
 		}
 	}
 
