@@ -359,7 +359,6 @@ async function processFile(
 
 	let fixedCount = 0;
 	let wasFixed = false;
-	let maxIterationsReached = false;
 
 	if (fix && diagnostics.length > 0) {
 		const fixResult = await applyCodeActions(
@@ -374,7 +373,6 @@ async function processFile(
 			content = fixResult.content;
 			wasFixed = true;
 			fixedCount = fixResult.fixedCount;
-			maxIterationsReached = fixResult.maxIterationsReached || false;
 			diagnostics = await validateDocument(state, absolutePath, content);
 		}
 	}
@@ -384,7 +382,6 @@ async function processFile(
 		diagnostics,
 		fixed: wasFixed,
 		fixedCount,
-		maxIterationsReached: maxIterationsReached ? true : undefined,
 	};
 }
 async function initializeState(

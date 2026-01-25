@@ -54,8 +54,6 @@ export const LANGUAGE_MAP: Record<string, string> = {
 
 export const DEFAULT_VERSION = "0.0.1";
 
-export const MAX_FIX_ITERATIONS = 10;
-
 export const DEFAULT_TAB_SIZE = 2;
 
 export const DEFAULT_SEPARATOR = ":";

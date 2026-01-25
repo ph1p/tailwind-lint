@@ -100,13 +100,6 @@ async function displayResults(
 			if (fixMode && file.fixed) {
 				const issueText = `${file.fixedCount || 0} issue${file.fixedCount !== 1 ? "s" : ""}`;
 				console.log(chalk.green(`  ✔ Fixed ${issueText}`));
-				if (file.maxIterationsReached && file.diagnostics.length > 0) {
-					console.log(
-						chalk.yellow(
-							`  ⚠ Maximum fix iterations reached - some issues may require manual intervention`,
-						),
-					);
-				}
 				totalFixed += file.fixedCount || 0;
 			}
 

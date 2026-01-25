@@ -2,7 +2,7 @@ import type { State } from "@tailwindcss/language-service";
 import { doCodeActions, doValidate } from "@tailwindcss/language-service";
 import type { CodeActionParams, Diagnostic } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { getLanguageId, MAX_FIX_ITERATIONS } from "./constants";
+import { getLanguageId } from "./constants";
 import type { ApplyCodeActionsResult, SerializedDiagnostic } from "./types";
 
 export type { ApplyCodeActionsResult };
@@ -119,8 +119,8 @@ export async function applyCodeActions(
 		let currentContent = content;
 		let totalFixed = 0;
 
-		let iteration = 0;
-		for (; iteration < MAX_FIX_ITERATIONS; iteration++) {
+		// Keep fixing until no more fixable issues remain
+		while (true) {
 			const currentDiagnostics = await doValidate(state, currentDocument);
 			if (currentDiagnostics.length === 0) break;
 
@@ -150,22 +150,10 @@ export async function applyCodeActions(
 			totalFixed++;
 		}
 
-		const maxIterationsReached = iteration === MAX_FIX_ITERATIONS;
-
-		if (maxIterationsReached) {
-			const remainingDiagnostics = await doValidate(state, currentDocument);
-			if (remainingDiagnostics.length > 0) {
-				console.warn(
-					`Warning: Reached maximum fix iterations (${MAX_FIX_ITERATIONS}) for ${filePath}. Some issues may remain.`,
-				);
-			}
-		}
-
 		return {
 			content: currentContent,
 			changed: currentContent !== content,
 			fixedCount: totalFixed,
-			maxIterationsReached: maxIterationsReached ? true : undefined,
 		};
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
