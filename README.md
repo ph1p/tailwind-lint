@@ -48,45 +48,55 @@ pnpm dlx tailwind-lint "src/**/*.html"
 tailwind-lint [options] [files...]
 ```
 
+### Quick Start
+
+Simply run `tailwind-lint` in your project directory - it automatically discovers your Tailwind config and files:
+
+```bash
+# Auto-discover config and lint files
+tailwind-lint
+
+# Fix issues automatically
+tailwind-lint --fix
+
+# Verbose mode for debugging
+tailwind-lint --verbose
+```
+
+### How Auto-Discovery Works
+
+**Tailwind CSS v4:**
+- Finds CSS config files: `app.css`, `src/app.css`, `index.css`, `src/index.css`, `tailwind.css`, `src/tailwind.css`
+- Uses file patterns from `@source` directives if present
+- Falls back to default pattern: `./**/*.{js,jsx,ts,tsx,html}`
+
+**Tailwind CSS v3:**
+- Finds JavaScript config files: `tailwind.config.js`, `tailwind.config.cjs`, `tailwind.config.mjs`, `tailwind.config.ts`
+- Uses file patterns from the `content` array in your config
+
 ### Options
 
 - `-c, --config <path>` - Path to Tailwind config file (default: auto-discover)
-- `-a, --auto` - Auto-discover files from config content patterns (v3 only)
+- `-a, --auto` - Auto-discover files from config content patterns (legacy, enabled by default)
 - `--fix` - Automatically fix problems that can be fixed
 - `-v, --verbose` - Enable verbose logging for debugging
 - `-h, --help` - Show help message
 - `--version` - Show version number
 
-### Examples
+### Advanced Examples
 
-**Tailwind CSS v4:**
 ```bash
-# Lint files
+# Lint specific files only
 tailwind-lint "src/**/*.{js,jsx,ts,tsx}"
 
-# With CSS config
-tailwind-lint "src/**/*.tsx" --config ./app.css
+# Specify a custom config location
+tailwind-lint --config ./config/tailwind.config.js
 
-# Fix issues (including canonical class suggestions)
-tailwind-lint "src/**/*.html" --fix
+# Lint and fix specific file types
+tailwind-lint "**/*.vue" --fix
 
-# Verbose mode for debugging
-tailwind-lint "src/**/*.tsx" --verbose
-```
-
-**Tailwind CSS v3 (Legacy):**
-```bash
-# With JavaScript config
-tailwind-lint --config ./tailwind.config.js
-
-# Auto-discover from config content patterns
-tailwind-lint --auto
-
-# Fix issues
-tailwind-lint --config ./tailwind.config.js --fix
-
-# Debug with verbose logging
-tailwind-lint --auto --verbose
+# Lint with a specific CSS config (v4)
+tailwind-lint --config ./styles/app.css
 ```
 
 ## Configuration

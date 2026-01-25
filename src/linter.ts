@@ -6,6 +6,7 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
 import {
 	CONCURRENT_FILES,
+	DEFAULT_FILE_PATTERN,
 	DEFAULT_IGNORE_PATTERNS,
 	getLanguageId,
 } from "./constants";
@@ -169,10 +170,10 @@ async function loadTailwindConfig(configPath: string): Promise<TailwindConfig> {
 
 	try {
 		const { createRequire } = await import("node:module");
-		const require = createRequire(import.meta.url || __filename);
-		delete require.cache[configPath];
+		const customRequire = createRequire(import.meta.url || __filename);
+		delete customRequire.cache[configPath];
 
-		const configModule = require(configPath) as
+		const configModule = customRequire(configPath) as
 			| TailwindConfig
 			| { default: TailwindConfig };
 		const config = (
@@ -283,11 +284,16 @@ async function discoverFilesFromConfig(
 		return expandPatterns(cwd, patterns);
 	}
 
-	throw new Error(
-		"Auto-discovery is not supported for Tailwind v4 CSS-based configs.\n" +
-			"Please specify file patterns explicitly:\n" +
-			'  tailwind-lint "src/**/*.{js,jsx,ts,tsx}"',
-	);
+	// For v4 CSS configs, try to extract @source patterns or use defaults
+	const cssContent = readFileSync(configFilePath);
+	const sourcePatterns = extractSourcePatterns(cssContent);
+
+	if (sourcePatterns.length > 0) {
+		return expandPatterns(cwd, sourcePatterns);
+	}
+
+	// Fallback to default pattern
+	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN]);
 }
 
 function extractContentPatterns(config: TailwindConfig): string[] {
@@ -304,6 +310,18 @@ function extractContentPatterns(config: TailwindConfig): string[] {
 	}
 
 	return [];
+}
+
+function extractSourcePatterns(cssContent: string): string[] {
+	const patterns: string[] = [];
+	// Match @source "pattern" or @source 'pattern'
+	const sourceRegex = /@source\s+["']([^"']+)["']/g;
+
+	for (const match of cssContent.matchAll(sourceRegex)) {
+		patterns.push(match[1]);
+	}
+
+	return patterns;
 }
 
 async function processFiles(

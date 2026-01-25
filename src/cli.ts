@@ -229,15 +229,16 @@ program
 		"after",
 		`
 ${chalk.bold.cyan("Examples:")}
+  ${chalk.dim("$")} tailwind-lint
   ${chalk.dim("$")} tailwind-lint ${chalk.green('"src/**/*.{js,jsx,ts,tsx}"')}
-  ${chalk.dim("$")} tailwind-lint ${chalk.yellow("--auto")}
   ${chalk.dim("$")} tailwind-lint ${chalk.yellow("--config")} ${chalk.green("./tailwind.config.js")}
   ${chalk.dim("$")} tailwind-lint ${chalk.green('"src/**/*.tsx"')} ${chalk.yellow("--fix")}
   ${chalk.dim("$")} tailwind-lint ${chalk.green('"**/*.vue"')}
 
 ${chalk.bold.cyan("Notes:")}
-  ${chalk.dim("•")} Use ${chalk.yellow("--auto")} to auto-discover files from your Tailwind config (v3 only)
-  ${chalk.dim("•")} Use ${chalk.yellow("--config")} alone to lint common file types from that directory
+  ${chalk.dim("•")} Running without arguments auto-discovers config and files
+  ${chalk.dim("•")} For v3: uses content patterns from tailwind.config.js
+  ${chalk.dim("•")} For v4: uses @source patterns from CSS config, or default pattern
   ${chalk.dim("•")} Default pattern: ${chalk.dim("./**/*.{js,jsx,ts,tsx,html}")}
   ${chalk.dim("•")} Use ${chalk.yellow("--fix")} to automatically resolve fixable issues
 `,
@@ -247,11 +248,9 @@ ${chalk.bold.cyan("Notes:")}
 		const hasAutoFlag = !!options.auto;
 		const hasFiles = files.length > 0;
 
+		// If no arguments provided, enable auto mode by default
 		if (!hasFiles && !hasAutoFlag && !hasConfigFlag) {
-			console.error(
-				"Error: No files specified. Use glob patterns, --auto flag, or --config flag.\n",
-			);
-			program.help();
+			options.auto = true;
 		}
 
 		const resolved = resolveOptions(files, options);
