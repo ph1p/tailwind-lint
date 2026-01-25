@@ -38,6 +38,7 @@ export interface ApplyCodeActionsResult {
 	content: string;
 	changed: boolean;
 	fixedCount: number;
+	maxIterationsReached?: boolean;
 }
 
 export interface LintFileResult {
@@ -45,6 +46,7 @@ export interface LintFileResult {
 	diagnostics: SerializedDiagnostic[];
 	fixed?: boolean;
 	fixedCount?: number;
+	maxIterationsReached?: boolean;
 }
 
 export interface LintOptions {

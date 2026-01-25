@@ -7,6 +7,5 @@ export default defineConfig({
 	target: "node22",
 	clean: true,
 	sourcemap: true,
-	// Bundle all dependencies
 	inlineOnly: false,
 });

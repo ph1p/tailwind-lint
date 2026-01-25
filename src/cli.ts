@@ -8,6 +8,8 @@ import { DEFAULT_FILE_PATTERN, DEFAULT_VERSION } from "./constants";
 import { lint } from "./linter";
 import type { LintFileResult, SerializedDiagnostic } from "./types";
 
+const MAX_FILENAME_DISPLAY_LENGTH = 50;
+
 function countDiagnosticsBySeverity(diagnostics: SerializedDiagnostic[]): {
 	errors: number;
 	warnings: number;
@@ -69,9 +71,9 @@ function resolveOptions(files: string[], options: CliOptions): ResolvedOptions {
 	};
 }
 
-function truncateFilename(filename: string, maxLength: number): string {
-	return filename.length > maxLength
-		? `...${filename.slice(-maxLength)}`
+function truncateFilename(filename: string): string {
+	return filename.length > MAX_FILENAME_DISPLAY_LENGTH
+		? `...${filename.slice(-MAX_FILENAME_DISPLAY_LENGTH)}`
 		: filename;
 }
 
@@ -99,6 +101,13 @@ async function displayResults(
 			if (fixMode && file.fixed) {
 				const issueText = `${file.fixedCount || 0} issue${file.fixedCount !== 1 ? "s" : ""}`;
 				console.log(chalk.green(`  ✔ Fixed ${issueText}`));
+				if (file.maxIterationsReached && file.diagnostics.length > 0) {
+					console.log(
+						chalk.yellow(
+							`  ⚠ Maximum fix iterations reached - some issues may require manual intervention`,
+						),
+					);
+				}
 				totalFixed += file.fixedCount || 0;
 			}
 
@@ -276,7 +285,7 @@ ${chalk.bold.cyan("Notes:")}
 				...resolved,
 				onProgress: (current, total, file) => {
 					if (process.stdout.isTTY && !resolved.verbose) {
-						const displayFile = truncateFilename(file, 50);
+						const displayFile = truncateFilename(file);
 						process.stdout.write(
 							`\rLinting files... (${current}/${total}) ${chalk.dim(displayFile)}${" ".repeat(10)}`,
 						);

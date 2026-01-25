@@ -1,38 +1,11 @@
-import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
 import { doCodeActions, doValidate } from "@tailwindcss/language-service";
 import type { CodeActionParams, Diagnostic } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { MAX_FIX_ITERATIONS } from "./constants";
+import { getLanguageId, MAX_FIX_ITERATIONS } from "./constants";
 import type { ApplyCodeActionsResult, SerializedDiagnostic } from "./types";
 
 export type { ApplyCodeActionsResult };
-
-function getLanguageId(filePath: string): string {
-	const LANGUAGE_MAP: Record<string, string> = {
-		".astro": "astro",
-		".css": "css",
-		".erb": "erb",
-		".hbs": "handlebars",
-		".htm": "html",
-		".html": "html",
-		".js": "javascript",
-		".jsx": "javascriptreact",
-		".less": "less",
-		".md": "markdown",
-		".mdx": "mdx",
-		".php": "php",
-		".sass": "sass",
-		".scss": "scss",
-		".svelte": "svelte",
-		".ts": "typescript",
-		".tsx": "typescriptreact",
-		".twig": "twig",
-		".vue": "vue",
-	};
-	const ext = path.extname(filePath).toLowerCase();
-	return LANGUAGE_MAP[ext] || "html";
-}
 
 interface QuickfixAction {
 	kind?: string;
@@ -139,55 +112,76 @@ export async function applyCodeActions(
 		};
 	}
 
-	const languageId = getLanguageId(filePath);
-	const uri = `file://${filePath}`;
-	let currentDocument = TextDocument.create(uri, languageId, 1, content);
-	let currentContent = content;
-	let totalFixed = 0;
+	try {
+		const languageId = getLanguageId(filePath);
+		const uri = `file://${filePath}`;
+		let currentDocument = TextDocument.create(uri, languageId, 1, content);
+		let currentContent = content;
+		let totalFixed = 0;
 
-	let iteration = 0;
-	for (; iteration < MAX_FIX_ITERATIONS; iteration++) {
-		const currentDiagnostics = await doValidate(state, currentDocument);
-		if (currentDiagnostics.length === 0) break;
+		let iteration = 0;
+		for (; iteration < MAX_FIX_ITERATIONS; iteration++) {
+			const currentDiagnostics = await doValidate(state, currentDocument);
+			if (currentDiagnostics.length === 0) break;
 
-		const quickfixes = await getQuickfixes(
-			state,
-			currentDocument,
-			uri,
-			currentDiagnostics,
-		);
-		if (quickfixes.length === 0) break;
-
-		const fixResult = applyFirstQuickfix(
-			quickfixes[0],
-			uri,
-			currentDocument,
-			currentContent,
-		);
-		if (!fixResult) break;
-
-		currentContent = fixResult.content;
-		currentDocument = TextDocument.create(
-			uri,
-			languageId,
-			currentDocument.version + 1,
-			currentContent,
-		);
-		totalFixed++;
-	}
-
-	if (iteration === MAX_FIX_ITERATIONS) {
-		const remainingDiagnostics = await doValidate(state, currentDocument);
-		if (remainingDiagnostics.length > 0) {
-			console.warn(
-				`Warning: Reached maximum fix iterations (${MAX_FIX_ITERATIONS}) for ${filePath}. Some issues may remain.`,
+			const quickfixes = await getQuickfixes(
+				state,
+				currentDocument,
+				uri,
+				currentDiagnostics,
 			);
-		}
-	}
+			if (quickfixes.length === 0) break;
 
-	return {
-		content: currentContent,
-		changed: currentContent !== content,
-		fixedCount: totalFixed,
-	};
+			const fixResult = applyFirstQuickfix(
+				quickfixes[0],
+				uri,
+				currentDocument,
+				currentContent,
+			);
+			if (!fixResult) break;
+
+			currentContent = fixResult.content;
+			currentDocument = TextDocument.create(
+				uri,
+				languageId,
+				currentDocument.version + 1,
+				currentContent,
+			);
+			totalFixed++;
+		}
+
+		const maxIterationsReached = iteration === MAX_FIX_ITERATIONS;
+
+		if (maxIterationsReached) {
+			const remainingDiagnostics = await doValidate(state, currentDocument);
+			if (remainingDiagnostics.length > 0) {
+				console.warn(
+					`Warning: Reached maximum fix iterations (${MAX_FIX_ITERATIONS}) for ${filePath}. Some issues may remain.`,
+				);
+			}
+		}
+
+		return {
+			content: currentContent,
+			changed: currentContent !== content,
+			fixedCount: totalFixed,
+			maxIterationsReached: maxIterationsReached ? true : undefined,
+		};
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+
+		// Handle language service crashes gracefully
+		if (message.includes("Cannot read") || message.includes("undefined")) {
+			console.warn(
+				`Warning: Language service crashed while applying fixes to ${filePath}. Skipping auto-fix for this file.`,
+			);
+			return {
+				content,
+				changed: false,
+				fixedCount: 0,
+			};
+		}
+
+		throw error;
+	}
 }

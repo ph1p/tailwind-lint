@@ -61,3 +61,8 @@ export const DEFAULT_TAB_SIZE = 2;
 export const DEFAULT_SEPARATOR = ":";
 
 export const DEFAULT_ROOT_FONT_SIZE = 16;
+
+export function getLanguageId(filePath: string): string {
+	const ext = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
+	return LANGUAGE_MAP[ext] || "html";
+}

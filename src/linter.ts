@@ -4,7 +4,7 @@ import { doValidate } from "@tailwindcss/language-service";
 import glob from "fast-glob";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
-import { DEFAULT_IGNORE_PATTERNS } from "./constants";
+import { DEFAULT_IGNORE_PATTERNS, getLanguageId } from "./constants";
 import { createState } from "./state";
 import type {
 	LintFileResult,
@@ -60,32 +60,6 @@ function serializeDiagnostics(
 	}));
 }
 
-function getLanguageId(filePath: string): string {
-	const LANGUAGE_MAP: Record<string, string> = {
-		".astro": "astro",
-		".css": "css",
-		".erb": "erb",
-		".hbs": "handlebars",
-		".htm": "html",
-		".html": "html",
-		".js": "javascript",
-		".jsx": "javascriptreact",
-		".less": "less",
-		".md": "markdown",
-		".mdx": "mdx",
-		".php": "php",
-		".sass": "sass",
-		".scss": "scss",
-		".svelte": "svelte",
-		".ts": "typescript",
-		".tsx": "typescriptreact",
-		".twig": "twig",
-		".vue": "vue",
-	};
-	const ext = path.extname(filePath).toLowerCase();
-	return LANGUAGE_MAP[ext] || "html";
-}
-
 async function validateDocument(
 	state: State,
 	filePath: string,
@@ -117,6 +91,15 @@ async function validateDocument(
 		return serializeDiagnostics(diagnostics);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
+
+		// Handle crashes from the language service gracefully
+		if (message.includes("Cannot read") || message.includes("undefined")) {
+			console.warn(
+				`Warning: Language service crashed while validating ${filePath}. Skipping this file.`,
+			);
+			return [];
+		}
+
 		throw new Error(`Failed to validate document ${filePath}: ${message}`);
 	}
 }
@@ -267,7 +250,10 @@ async function discoverFilesFromConfig(
 	const configFilePath = await findTailwindConfigPath(cwd, configPath);
 
 	if (!configFilePath) {
-		throw new Error("Could not find Tailwind config");
+		throw new Error(
+			"Could not find Tailwind config for auto-discovery.\n" +
+				"Use --config to specify the path, or provide file patterns directly.",
+		);
 	}
 
 	if (!isCssConfigFile(configFilePath)) {
@@ -275,21 +261,28 @@ async function discoverFilesFromConfig(
 
 		if (!config || !config.content) {
 			throw new Error(
-				"Could not find Tailwind config or config has no content property",
+				"Tailwind config is missing the 'content' property.\n" +
+					"Add a content array to specify which files to scan:\n" +
+					"  content: ['./src/**/*.{js,jsx,ts,tsx}']",
 			);
 		}
 
 		const patterns = extractContentPatterns(config);
 
 		if (patterns.length === 0) {
-			throw new Error("No content patterns found in Tailwind config");
+			throw new Error(
+				"No content patterns found in Tailwind config.\n" +
+					"Ensure your config has a content array with file patterns.",
+			);
 		}
 
 		return expandPatterns(cwd, patterns);
 	}
 
 	throw new Error(
-		"Auto-discovery is not supported for CSS-based configs (v4). Please specify file patterns.",
+		"Auto-discovery is not supported for Tailwind v4 CSS-based configs.\n" +
+			"Please specify file patterns explicitly:\n" +
+			'  tailwind-lint "src/**/*.{js,jsx,ts,tsx}"',
 	);
 }
 
@@ -351,6 +344,7 @@ async function processFile(
 
 	let fixedCount = 0;
 	let wasFixed = false;
+	let maxIterationsReached = false;
 
 	if (fix && diagnostics.length > 0) {
 		const fixResult = await applyCodeActions(
@@ -365,8 +359,7 @@ async function processFile(
 			content = fixResult.content;
 			wasFixed = true;
 			fixedCount = fixResult.fixedCount;
-
-			// Re-validate to get remaining diagnostics
+			maxIterationsReached = fixResult.maxIterationsReached || false;
 			diagnostics = await validateDocument(state, absolutePath, content);
 		}
 	}
@@ -376,6 +369,7 @@ async function processFile(
 		diagnostics,
 		fixed: wasFixed,
 		fixedCount,
+		maxIterationsReached: maxIterationsReached ? true : undefined,
 	};
 }
 async function initializeState(

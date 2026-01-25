@@ -80,6 +80,24 @@ async function loadTailwindConfig(configPath: string): Promise<TailwindConfig> {
 		return config;
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
+
+		if (errorMessage.includes("Cannot find module")) {
+			throw new Error(
+				`Failed to load config from ${configPath}.\n` +
+					"The config file may have missing dependencies. Check that all imports are installed.",
+			);
+		}
+
+		if (
+			errorMessage.includes("SyntaxError") ||
+			errorMessage.includes("Unexpected token")
+		) {
+			throw new Error(
+				`Failed to parse config from ${configPath}.\n` +
+					"The config file has syntax errors. Check your JavaScript/TypeScript syntax.",
+			);
+		}
+
 		throw new Error(
 			`Failed to load config from ${configPath}: ${errorMessage}`,
 		);
@@ -132,7 +150,8 @@ function resolveTailwindPath(cwd: string, configDir?: string): string {
 		return require.resolve("tailwindcss", { paths });
 	} catch {
 		throw new Error(
-			`Could not resolve tailwindcss module from ${paths.join(" or ")}`,
+			`Could not find tailwindcss module in ${paths.join(" or ")}.\n` +
+				"Install it with: npm install -D tailwindcss",
 		);
 	}
 }
@@ -145,7 +164,12 @@ export async function createState(
 	const resolvedConfigPath = await findTailwindConfigPath(cwd, configPath);
 
 	if (!resolvedConfigPath) {
-		throw new Error("Could not find tailwind config file (JS/TS or CSS)");
+		throw new Error(
+			"Could not find Tailwind config file. Expected one of:\n" +
+				"  • Tailwind v4 (CSS): app.css, index.css, tailwind.css in project root or src/\n" +
+				"  • Tailwind v3 (JS): tailwind.config.js, tailwind.config.ts\n" +
+				"Run 'npx tailwindcss init' to create a config file.",
+		);
 	}
 
 	const isCssConfig = isCssConfigFile(resolvedConfigPath);
