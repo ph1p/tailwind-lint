@@ -97,7 +97,6 @@ async function validateDocument(
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 
-		// Handle crashes from the language service gracefully
 		if (message.includes("Cannot read") || message.includes("undefined")) {
 			console.warn(
 				`Warning: Language service crashed while validating ${filePath}. Skipping this file.`,
@@ -284,7 +283,6 @@ async function discoverFilesFromConfig(
 		return expandPatterns(cwd, patterns);
 	}
 
-	// For v4 CSS configs, try to extract @source patterns or use defaults
 	const cssContent = readFileSync(configFilePath);
 	const sourcePatterns = extractSourcePatterns(cssContent);
 
@@ -292,7 +290,6 @@ async function discoverFilesFromConfig(
 		return expandPatterns(cwd, sourcePatterns);
 	}
 
-	// Fallback to default pattern
 	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN]);
 }
 
@@ -314,7 +311,6 @@ function extractContentPatterns(config: TailwindConfig): string[] {
 
 function extractSourcePatterns(cssContent: string): string[] {
 	const patterns: string[] = [];
-	// Match @source "pattern" or @source 'pattern'
 	const sourceRegex = /@source\s+["']([^"']+)["']/g;
 
 	for (const match of cssContent.matchAll(sourceRegex)) {
