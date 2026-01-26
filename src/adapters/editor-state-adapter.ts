@@ -86,7 +86,7 @@ export function createEditorState(cwd: string) {
 			const dir = path.resolve(path.dirname(docPath), directory);
 			try {
 				const files = fs.readdirSync(dir);
-				return files.map((file) => [
+				return files.map((file): [string, { isDirectory: boolean }] => [
 					file,
 					{ isDirectory: isDirectory(path.join(dir, file)) },
 				]);
