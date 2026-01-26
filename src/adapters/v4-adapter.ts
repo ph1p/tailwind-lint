@@ -1,26 +1,12 @@
-import * as fs from "node:fs";
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
+import chalk from "chalk";
 import type { DesignSystem } from "../types";
 import { AdapterLoadError } from "../types";
+import { fileExists, readFileSync } from "../utils/fs";
 
 const require = createRequire(import.meta.url || __filename);
-
-function fileExists(filePath: string): boolean {
-	try {
-		return fs.existsSync(filePath);
-	} catch {
-		return false;
-	}
-}
-
-function readFileSync(filePath: string): string {
-	if (!filePath || typeof filePath !== "string") {
-		throw new TypeError("File path must be a non-empty string");
-	}
-	return fs.readFileSync(filePath, "utf-8");
-}
 
 export async function loadV4DesignSystem(
 	state: State,
@@ -43,7 +29,7 @@ export async function loadV4DesignSystem(
 			const basePath = path.dirname(configPath);
 
 			if (fileExists(configPath)) {
-				cssContent = readFileSync(configPath, true);
+				cssContent = readFileSync(configPath);
 			} else {
 				cssContent = '@import "tailwindcss";';
 			}
@@ -84,17 +70,19 @@ export async function loadV4DesignSystem(
 							if (fileExists(cssPath)) {
 								return {
 									base: pkgDir,
-									content: readFileSync(cssPath, true),
+									content: readFileSync(cssPath),
 								};
 							}
-						} catch {}
+						} catch {
+							// Package not found or doesn't have index.css - continue to file path resolution
+						}
 					}
 
 					const filePath = path.resolve(base, _id);
 					if (fileExists(filePath)) {
 						return {
 							base: path.dirname(filePath),
-							content: readFileSync(filePath, true),
+							content: readFileSync(filePath),
 						};
 					}
 
@@ -132,7 +120,7 @@ export async function loadV4DesignSystem(
 			}
 
 			if (verbose) {
-				console.log("  ✓ Loaded v4 design system");
+				console.log(chalk.dim("  ✓ Loaded v4 design system"));
 			}
 		} else {
 			const error = new Error(

@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
+import chalk from "chalk";
 import type { ContextUtils, GenerateRulesModule } from "../types";
 import { AdapterLoadError } from "../types";
 
@@ -48,13 +49,19 @@ export async function loadV3ClassMetadata(
 			};
 
 			if (verbose) {
-				console.log("  ✓ Loaded v3 JIT modules");
+				console.log(chalk.dim("  ✓ Loaded v3 JIT modules"));
 			}
 		} catch (jitError) {
+			// JIT modules are optional - some v3 configs may not have them
+			// Fall back to basic module loading without JIT support
 			if (verbose) {
 				const message =
 					jitError instanceof Error ? jitError.message : String(jitError);
-				console.log(`  ⚠ Warning: Could not load v3 JIT modules: ${message}`);
+				console.log(
+					chalk.yellow(
+						`  ⚠ Warning: Could not load v3 JIT modules: ${message}`,
+					),
+				);
 			}
 
 			state.modules = {

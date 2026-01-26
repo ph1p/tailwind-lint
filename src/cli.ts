@@ -4,7 +4,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import { DEFAULT_FILE_PATTERN, DEFAULT_VERSION } from "./constants";
+import {
+	DEFAULT_FILE_PATTERN,
+	DEFAULT_VERSION,
+	SEVERITY,
+	TERMINAL_PADDING,
+	TERMINAL_WIDTH,
+} from "./constants";
 import { lint } from "./linter";
 import type { LintFileResult, SerializedDiagnostic } from "./types";
 
@@ -18,8 +24,8 @@ function countDiagnosticsBySeverity(diagnostics: SerializedDiagnostic[]): {
 	let warnings = 0;
 
 	for (const diagnostic of diagnostics) {
-		if (diagnostic.severity === 1) errors++;
-		if (diagnostic.severity === 2) warnings++;
+		if (diagnostic.severity === SEVERITY.ERROR) errors++;
+		if (diagnostic.severity === SEVERITY.WARNING) warnings++;
 	}
 
 	return { errors, warnings };
@@ -114,9 +120,10 @@ async function displayResults(
 			for (const diagnostic of file.diagnostics) {
 				const line = diagnostic.range.start.line + 1;
 				const char = diagnostic.range.start.character + 1;
-				const severity = diagnostic.severity === 1 ? "error" : "warning";
+				const severity =
+					diagnostic.severity === SEVERITY.ERROR ? "error" : "warning";
 				const severityColor =
-					diagnostic.severity === 1
+					diagnostic.severity === SEVERITY.ERROR
 						? chalk.red(severity)
 						: chalk.yellow(severity);
 				const code = diagnostic.code ? chalk.dim(`  (${diagnostic.code})`) : "";
@@ -257,7 +264,7 @@ ${chalk.bold.cyan("Notes:")}
 
 		try {
 			if (resolved.verbose) {
-				console.log(chalk.cyan("→ Running in verbose mode"));
+				console.log(chalk.cyan.bold("→ Configuration"));
 				console.log(chalk.dim(`  Working directory: ${resolved.cwd}`));
 				console.log(
 					chalk.dim(`  Config path: ${resolved.configPath || "auto-discover"}`),
@@ -268,9 +275,8 @@ ${chalk.bold.cyan("Notes:")}
 						`  Patterns: ${resolved.patterns.length > 0 ? resolved.patterns.join(", ") : "auto-discover"}`,
 					),
 				);
+				console.log();
 			}
-
-			console.log();
 
 			const results = await lint({
 				...resolved,
@@ -278,7 +284,7 @@ ${chalk.bold.cyan("Notes:")}
 					if (process.stdout.isTTY && !resolved.verbose) {
 						const displayFile = truncateFilename(file);
 						process.stdout.write(
-							`\rLinting files... (${current}/${total}) ${chalk.dim(displayFile)}${" ".repeat(10)}`,
+							`\r${chalk.cyan("→")} Linting files... ${chalk.dim(`(${current}/${total})`)} ${chalk.dim(displayFile)}${" ".repeat(TERMINAL_PADDING)}`,
 						);
 					} else if (resolved.verbose) {
 						console.log(chalk.dim(`  [${current}/${total}] Linting ${file}`));
@@ -287,11 +293,12 @@ ${chalk.bold.cyan("Notes:")}
 			});
 
 			if (process.stdout.isTTY && !resolved.verbose) {
-				process.stdout.write("\n");
+				process.stdout.write(`\r${" ".repeat(TERMINAL_WIDTH)}\r`);
 			}
 
 			if (results.totalFilesProcessed === 0) {
-				console.log(chalk.yellow("No files found to lint."));
+				console.log();
+				console.log(chalk.yellow("⚠ No files found to lint"));
 				process.exit(0);
 			}
 
@@ -303,7 +310,7 @@ ${chalk.bold.cyan("Notes:")}
 			await displayResults(results.files, resolved.fix);
 
 			const hasErrors = results.files.some((file) =>
-				file.diagnostics.some((d) => d.severity === 1),
+				file.diagnostics.some((d) => d.severity === SEVERITY.ERROR),
 			);
 			process.exit(hasErrors ? 1 : 0);
 		} catch (error) {

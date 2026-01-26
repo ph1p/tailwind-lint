@@ -62,6 +62,24 @@ export const DEFAULT_ROOT_FONT_SIZE = 16;
 
 export const CONCURRENT_FILES = 10;
 
+export const SEVERITY = {
+	ERROR: 1,
+	WARNING: 2,
+} as const;
+
+export const TERMINAL_WIDTH = 80;
+export const TERMINAL_PADDING = 10;
+
+export const MAX_FIX_ITERATIONS = 100;
+export const QUICKFIX_ACTION_KIND = "quickfix";
+
+export const TAILWIND_V4_IMPORT_PATTERNS = [
+	'@import "tailwindcss"',
+	"@import 'tailwindcss'",
+] as const;
+
+export const CSS_CONFIG_EXTENSION = ".css";
+
 export function getLanguageId(filePath: string): string {
 	const ext = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
 	return LANGUAGE_MAP[ext] || "html";
