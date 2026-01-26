@@ -139,7 +139,7 @@ Use `--fix` to automatically resolve issues:
 - **Canonical class suggestions** (v4) - Replaces arbitrary values with standard classes
 - **Recommended variant order** (v3 & v4) - Reorders variants correctly
 
-Files are written atomically with multiple iterations to ensure all fixes are applied.
+Files are written atomically with multiple iterations to ensure all fixes are applied. The autofix process has a safety limit of 100 iterations per file to prevent infinite loops.
 
 ## Output Examples
 

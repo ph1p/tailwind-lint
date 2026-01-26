@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
 import { doValidate } from "@tailwindcss/language-service";
+import chalk from "chalk";
 import glob from "fast-glob";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
@@ -18,31 +19,12 @@ import type {
 	SerializedDiagnostic,
 	TailwindConfig,
 } from "./types";
-
-function fileExists(filePath: string): boolean {
-	try {
-		return require("node:fs").existsSync(filePath);
-	} catch {
-		return false;
-	}
-}
-
-function readFileSync(filePath: string): string {
-	if (!filePath || typeof filePath !== "string") {
-		throw new TypeError("File path must be a non-empty string");
-	}
-	return require("node:fs").readFileSync(filePath, "utf-8");
-}
-
-function writeFileSync(filePath: string, content: string): void {
-	if (!filePath || typeof filePath !== "string") {
-		throw new TypeError("File path must be a non-empty string");
-	}
-	if (typeof content !== "string") {
-		throw new TypeError("Content must be a string");
-	}
-	require("node:fs").writeFileSync(filePath, content, "utf-8");
-}
+import {
+	findTailwindConfigPath,
+	isCssConfigFile,
+	loadTailwindConfig,
+} from "./utils/config";
+import { fileExists, readFileSync, writeFileSync } from "./utils/fs";
 
 function serializeDiagnostics(
 	diagnostics: import("vscode-languageserver").Diagnostic[],
@@ -109,89 +91,7 @@ async function validateDocument(
 	}
 }
 
-async function findTailwindConfigPath(
-	cwd: string,
-	configPath?: string,
-): Promise<string | null> {
-	const { V3_CONFIG_PATHS, V4_CSS_FOLDERS, V4_CSS_NAMES } = await import(
-		"./constants"
-	);
-
-	if (configPath) {
-		const resolved = path.isAbsolute(configPath)
-			? configPath
-			: path.resolve(cwd, configPath);
-		return fileExists(resolved) ? resolved : null;
-	}
-
-	for (const p of V3_CONFIG_PATHS) {
-		const fullPath = path.join(cwd, p);
-		if (fileExists(fullPath)) {
-			return fullPath;
-		}
-	}
-
-	const v4Paths = V4_CSS_FOLDERS.flatMap((folder) =>
-		V4_CSS_NAMES.map((name) => path.join(folder, name)),
-	);
-
-	for (const p of v4Paths) {
-		const fullPath = path.join(cwd, p);
-		if (fileExists(fullPath)) {
-			try {
-				const content = readFileSync(fullPath);
-				if (
-					content.includes('@import "tailwindcss"') ||
-					content.includes("@import 'tailwindcss'")
-				) {
-					return fullPath;
-				}
-			} catch {}
-		}
-	}
-
-	return null;
-}
-
-function isCssConfigFile(filePath: string): boolean {
-	return filePath.endsWith(".css");
-}
-
-async function loadTailwindConfig(configPath: string): Promise<TailwindConfig> {
-	if (isCssConfigFile(configPath)) {
-		return {};
-	}
-
-	if (!path.isAbsolute(configPath)) {
-		throw new Error(
-			`Config path must be absolute for security reasons: ${configPath}`,
-		);
-	}
-
-	try {
-		const { createRequire } = await import("node:module");
-		const customRequire = createRequire(import.meta.url || __filename);
-		delete customRequire.cache[configPath];
-
-		const configModule = customRequire(configPath) as
-			| TailwindConfig
-			| { default: TailwindConfig };
-		const config = (
-			"default" in configModule ? configModule.default : configModule
-		) as TailwindConfig;
-
-		if (typeof config !== "object" || config === null) {
-			throw new Error("Config must be an object");
-		}
-
-		return config;
-	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		throw new Error(
-			`Failed to load config from ${configPath}: ${errorMessage}`,
-		);
-	}
-}
+// Config utilities moved to src/utils/config.ts
 
 async function discoverFiles(
 	cwd: string,
@@ -292,7 +192,7 @@ async function discoverFilesFromConfig(
 		return expandPatterns(cwd, sourcePatterns);
 	}
 
-	// Fallback to default pattern
+	// Fallback to default pattern for v4
 	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN]);
 }
 
@@ -408,12 +308,9 @@ async function initializeState(
 	verbose = false,
 ) {
 	try {
-		if (verbose) {
-			console.log("→ Initializing Tailwind CSS language service...");
-		}
 		const state = await createState(cwd, configPath, verbose);
 		if (verbose) {
-			console.log("  ✓ State initialized successfully\n");
+			console.log();
 		}
 		return state;
 	} catch (error) {
@@ -433,19 +330,22 @@ export async function lint({
 	verbose = false,
 	onProgress,
 }: LintOptions): Promise<LintResult> {
+	const state = await initializeState(cwd, configPath, verbose);
 	const files = await discoverFiles(cwd, patterns, configPath, autoDiscover);
 
 	if (verbose) {
 		console.log(
-			`→ Discovered ${files.length} file${files.length !== 1 ? "s" : ""} to lint`,
+			chalk.cyan.bold(
+				`→ Discovered ${files.length} file${files.length !== 1 ? "s" : ""} to lint`,
+			),
 		);
+		console.log();
 	}
 
 	if (files.length === 0) {
 		return { files: [], totalFilesProcessed: 0 };
 	}
 
-	const state = await initializeState(cwd, configPath, verbose);
 	const results = await processFiles(state, cwd, files, fix, onProgress);
 
 	return {

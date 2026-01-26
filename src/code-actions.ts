@@ -2,7 +2,11 @@ import type { State } from "@tailwindcss/language-service";
 import { doCodeActions, doValidate } from "@tailwindcss/language-service";
 import type { CodeActionParams, Diagnostic } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { getLanguageId } from "./constants";
+import {
+	getLanguageId,
+	MAX_FIX_ITERATIONS,
+	QUICKFIX_ACTION_KIND,
+} from "./constants";
 import type { ApplyCodeActionsResult, SerializedDiagnostic } from "./types";
 
 export type { ApplyCodeActionsResult };
@@ -51,7 +55,8 @@ async function getQuickfixes(
 
 	return codeActions.filter(
 		(action) =>
-			action.kind === "quickfix" || action.kind?.startsWith("quickfix."),
+			action.kind === QUICKFIX_ACTION_KIND ||
+			action.kind?.startsWith(`${QUICKFIX_ACTION_KIND}.`),
 	) as QuickfixAction[];
 }
 
@@ -120,7 +125,8 @@ export async function applyCodeActions(
 		let totalFixed = 0;
 
 		// Keep fixing until no more fixable issues remain
-		while (true) {
+		// Add iteration limit to prevent infinite loops
+		for (let iteration = 0; iteration < MAX_FIX_ITERATIONS; iteration++) {
 			const currentDiagnostics = await doValidate(state, currentDocument);
 			if (currentDiagnostics.length === 0) break;
 
@@ -148,6 +154,13 @@ export async function applyCodeActions(
 				currentContent,
 			);
 			totalFixed++;
+
+			// Safety check: warn if approaching iteration limit
+			if (iteration === MAX_FIX_ITERATIONS - 1) {
+				console.warn(
+					`Warning: Reached maximum fix iterations (${MAX_FIX_ITERATIONS}) for ${filePath}. Some issues may remain unfixed.`,
+				);
+			}
 		}
 
 		return {
