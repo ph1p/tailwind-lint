@@ -81,7 +81,7 @@ export async function loadV3ClassMetadata(
 	}
 }
 
-function extractConfigMetadata(state: State): void {
+function extractConfigMetadata(state: State) {
 	const { config } = state;
 	if (!config || typeof config !== "object") return;
 

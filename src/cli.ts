@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
+import type { Diagnostic } from "vscode-languageserver";
 import {
 	DEFAULT_FILE_PATTERN,
 	DEFAULT_VERSION,
@@ -12,11 +13,11 @@ import {
 	TERMINAL_WIDTH,
 } from "./constants";
 import { lint } from "./linter";
-import type { LintFileResult, SerializedDiagnostic } from "./types";
+import type { LintFileResult } from "./types";
 
 const MAX_FILENAME_DISPLAY_LENGTH = 50;
 
-function countDiagnosticsBySeverity(diagnostics: SerializedDiagnostic[]): {
+function countDiagnosticsBySeverity(diagnostics: Diagnostic[]): {
 	errors: number;
 	warnings: number;
 } {
@@ -31,15 +32,6 @@ function countDiagnosticsBySeverity(diagnostics: SerializedDiagnostic[]): {
 	return { errors, warnings };
 }
 
-interface ResolvedOptions {
-	cwd: string;
-	configPath: string | undefined;
-	patterns: string[];
-	autoDiscover: boolean;
-	fix: boolean;
-	verbose: boolean;
-}
-
 interface CliOptions {
 	config?: string;
 	auto?: boolean;
@@ -47,7 +39,7 @@ interface CliOptions {
 	verbose?: boolean;
 }
 
-function resolveOptions(files: string[], options: CliOptions): ResolvedOptions {
+function resolveOptions(files: string[], options: CliOptions) {
 	const hasConfigFlag = !!options.config;
 	const hasAutoFlag = !!options.auto;
 	const hasFiles = files.length > 0;
@@ -77,16 +69,13 @@ function resolveOptions(files: string[], options: CliOptions): ResolvedOptions {
 	};
 }
 
-function truncateFilename(filename: string): string {
+function truncateFilename(filename: string) {
 	return filename.length > MAX_FILENAME_DISPLAY_LENGTH
 		? `...${filename.slice(-MAX_FILENAME_DISPLAY_LENGTH)}`
 		: filename;
 }
 
-async function displayResults(
-	files: LintFileResult[],
-	fixMode: boolean,
-): Promise<void> {
+async function displayResults(files: LintFileResult[], fixMode: boolean) {
 	let totalErrors = 0;
 	let totalWarnings = 0;
 	let totalFixed = 0;

@@ -6,9 +6,7 @@ import { fileExists, readFileSync } from "./fs";
 
 const require = createRequire(import.meta.url || __filename);
 
-export function isCssConfigFile(filePath: string): boolean {
-	return filePath.endsWith(".css");
-}
+export const isCssConfigFile = (filePath: string) => filePath.endsWith(".css");
 
 export async function loadTailwindConfig(
 	configPath: string,

@@ -3,7 +3,6 @@ import type { State } from "@tailwindcss/language-service";
 import { doValidate } from "@tailwindcss/language-service";
 import chalk from "chalk";
 import glob from "fast-glob";
-import type { Diagnostic } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
 import {
@@ -17,7 +16,6 @@ import type {
 	LintFileResult,
 	LintOptions,
 	LintResult,
-	SerializedDiagnostic,
 	TailwindConfig,
 } from "./types";
 import {
@@ -27,32 +25,11 @@ import {
 } from "./utils/config";
 import { fileExists, readFileSync, writeFileSync } from "./utils/fs";
 
-function serializeDiagnostics(
-	diagnostics: Diagnostic[],
-): SerializedDiagnostic[] {
-	return diagnostics.map((diagnostic) => ({
-		range: {
-			start: {
-				line: diagnostic.range.start.line,
-				character: diagnostic.range.start.character,
-			},
-			end: {
-				line: diagnostic.range.end.line,
-				character: diagnostic.range.end.character,
-			},
-		},
-		severity: diagnostic.severity || 2,
-		message: diagnostic.message,
-		code: diagnostic.code?.toString(),
-		source: diagnostic.source,
-	}));
-}
-
 async function validateDocument(
 	state: State,
 	filePath: string,
 	content: string,
-): Promise<SerializedDiagnostic[]> {
+) {
 	try {
 		if (!state) {
 			throw new Error("State is not initialized");
@@ -74,9 +51,7 @@ async function validateDocument(
 		const uri = `file://${filePath}`;
 		const document = TextDocument.create(uri, languageId, 1, content);
 
-		const diagnostics = await doValidate(state, document);
-
-		return serializeDiagnostics(diagnostics);
+		return await doValidate(state, document);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 
@@ -96,17 +71,14 @@ async function discoverFiles(
 	patterns: string[],
 	configPath: string | undefined,
 	autoDiscover: boolean,
-): Promise<string[]> {
+) {
 	if (autoDiscover) {
 		return discoverFilesFromConfig(cwd, configPath);
 	}
 	return expandPatterns(cwd, patterns);
 }
 
-async function expandPatterns(
-	cwd: string,
-	patterns: string[],
-): Promise<string[]> {
+async function expandPatterns(cwd: string, patterns: string[]) {
 	return glob(patterns, {
 		cwd,
 		absolute: false,
@@ -114,10 +86,7 @@ async function expandPatterns(
 	});
 }
 
-async function discoverFilesFromConfig(
-	cwd: string,
-	configPath?: string,
-): Promise<string[]> {
+async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 	const configFilePath = await findTailwindConfigPath(cwd, configPath);
 
 	if (!configFilePath) {
@@ -160,7 +129,7 @@ async function discoverFilesFromConfig(
 	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN]);
 }
 
-function extractContentPatterns(config: TailwindConfig): string[] {
+function extractContentPatterns(config: TailwindConfig) {
 	if (!config.content) return [];
 
 	const content = Array.isArray(config.content)
@@ -170,7 +139,7 @@ function extractContentPatterns(config: TailwindConfig): string[] {
 	return content.filter((p): p is string => typeof p === "string");
 }
 
-function extractSourcePatterns(cssContent: string): string[] {
+function extractSourcePatterns(cssContent: string) {
 	const patterns: string[] = [];
 	const sourceRegex = /@source\s+["']([^"']+)["']/g;
 
@@ -187,7 +156,7 @@ async function processFiles(
 	files: string[],
 	fix: boolean,
 	onProgress?: (current: number, total: number, file: string) => void,
-): Promise<LintFileResult[]> {
+) {
 	const results: LintFileResult[] = [];
 
 	for (let i = 0; i < files.length; i += CONCURRENT_FILES) {
@@ -215,7 +184,7 @@ async function processFile(
 	cwd: string,
 	filePath: string,
 	fix: boolean,
-): Promise<LintFileResult | null> {
+) {
 	const absolutePath = path.isAbsolute(filePath)
 		? filePath
 		: path.resolve(cwd, filePath);

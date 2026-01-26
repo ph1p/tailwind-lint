@@ -80,7 +80,7 @@ export const TAILWIND_V4_IMPORT_PATTERNS = [
 
 export const CSS_CONFIG_EXTENSION = ".css";
 
-export function getLanguageId(filePath: string): string {
+export function getLanguageId(filePath: string) {
 	const ext = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
 	return LANGUAGE_MAP[ext] || "html";
 }

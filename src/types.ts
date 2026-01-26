@@ -1,3 +1,5 @@
+import type { Diagnostic } from "vscode-languageserver";
+
 export interface TailwindConfig {
 	content?: string[] | { files?: string[] };
 	separator?: string;
@@ -23,17 +25,6 @@ export interface GenerateRulesModule {
 	[key: string]: unknown;
 }
 
-export interface SerializedDiagnostic {
-	range: {
-		start: { line: number; character: number };
-		end: { line: number; character: number };
-	};
-	severity: number;
-	message: string;
-	code?: string;
-	source?: string;
-}
-
 export interface ApplyCodeActionsResult {
 	content: string;
 	changed: boolean;
@@ -42,7 +33,7 @@ export interface ApplyCodeActionsResult {
 
 export interface LintFileResult {
 	path: string;
-	diagnostics: SerializedDiagnostic[];
+	diagnostics: Diagnostic[];
 	fixed?: boolean;
 	fixedCount?: number;
 }

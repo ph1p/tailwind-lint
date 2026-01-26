@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 
-export function fileExists(filePath: string): boolean {
+export function fileExists(filePath: string) {
 	try {
 		return fs.existsSync(filePath);
 	} catch {
@@ -9,14 +9,14 @@ export function fileExists(filePath: string): boolean {
 	}
 }
 
-export function readFileSync(filePath: string): string {
+export function readFileSync(filePath: string) {
 	if (!filePath || typeof filePath !== "string") {
 		throw new TypeError("File path must be a non-empty string");
 	}
 	return fs.readFileSync(filePath, "utf-8");
 }
 
-export function writeFileSync(filePath: string, content: string): void {
+export function writeFileSync(filePath: string, content: string) {
 	if (!filePath || typeof filePath !== "string") {
 		throw new TypeError("File path must be a non-empty string");
 	}

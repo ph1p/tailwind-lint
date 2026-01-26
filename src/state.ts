@@ -15,7 +15,7 @@ import {
 
 const require = createRequire(import.meta.url || __filename);
 
-function getTailwindVersion(cwd: string): string | undefined {
+function getTailwindVersion(cwd: string) {
 	try {
 		const tailwindPackageJson = require.resolve("tailwindcss/package.json", {
 			paths: [cwd],
@@ -30,11 +30,11 @@ function getTailwindVersion(cwd: string): string | undefined {
 	}
 }
 
-function isV4Config(version: string | undefined): boolean {
+function isV4Config(version: string | undefined) {
 	return version?.startsWith("4.") ?? false;
 }
 
-function resolveTailwindPath(cwd: string, configDir?: string): string {
+function resolveTailwindPath(cwd: string, configDir?: string) {
 	const paths = configDir ? [configDir, cwd] : [cwd];
 	try {
 		return require.resolve("tailwindcss", { paths });

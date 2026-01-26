@@ -3,7 +3,7 @@ import * as path from "node:path";
 import type { EditorState, Settings } from "@tailwindcss/language-service";
 import { DEFAULT_ROOT_FONT_SIZE, DEFAULT_TAB_SIZE } from "../constants";
 
-function isDirectory(filePath: string): boolean {
+function isDirectory(filePath: string) {
 	try {
 		return fs.statSync(filePath).isDirectory();
 	} catch {
@@ -11,7 +11,7 @@ function isDirectory(filePath: string): boolean {
 	}
 }
 
-export function createEditorState(cwd: string): EditorState {
+export function createEditorState(cwd: string) {
 	const settings: Settings = {
 		editor: {
 			tabSize: DEFAULT_TAB_SIZE,

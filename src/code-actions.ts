@@ -7,7 +7,7 @@ import {
 	MAX_FIX_ITERATIONS,
 	QUICKFIX_ACTION_KIND,
 } from "./constants";
-import type { ApplyCodeActionsResult, SerializedDiagnostic } from "./types";
+import type { ApplyCodeActionsResult } from "./types";
 
 export type { ApplyCodeActionsResult };
 
@@ -23,7 +23,7 @@ async function getQuickfixes(
 	document: TextDocument,
 	uri: string,
 	diagnostics: Diagnostic[],
-): Promise<QuickfixAction[]> {
+) {
 	const lspDiagnostics: Diagnostic[] = diagnostics.map((diag) => ({
 		range: diag.range,
 		severity: diag.severity,
@@ -65,9 +65,7 @@ function applyFirstQuickfix(
 	uri: string,
 	document: TextDocument,
 	content: string,
-): {
-	content: string;
-} | null {
+) {
 	if (!action.edit?.changes?.[uri]) return null;
 
 	const edits = action.edit.changes[uri] as {
@@ -107,7 +105,7 @@ export async function applyCodeActions(
 	state: State,
 	filePath: string,
 	content: string,
-	diagnostics: SerializedDiagnostic[],
+	diagnostics: Diagnostic[],
 ): Promise<ApplyCodeActionsResult> {
 	if (diagnostics.length === 0) {
 		return {
