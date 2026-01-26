@@ -6,6 +6,6 @@ export default defineConfig({
 	platform: "node",
 	target: "node22",
 	clean: true,
-	sourcemap: true,
+	sourcemap: false,
 	inlineOnly: false,
 });
