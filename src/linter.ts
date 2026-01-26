@@ -3,6 +3,7 @@ import type { State } from "@tailwindcss/language-service";
 import { doValidate } from "@tailwindcss/language-service";
 import chalk from "chalk";
 import glob from "fast-glob";
+import type { Diagnostic } from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
 import {
@@ -27,7 +28,7 @@ import {
 import { fileExists, readFileSync, writeFileSync } from "./utils/fs";
 
 function serializeDiagnostics(
-	diagnostics: import("vscode-languageserver").Diagnostic[],
+	diagnostics: Diagnostic[],
 ): SerializedDiagnostic[] {
 	return diagnostics.map((diagnostic) => ({
 		range: {
@@ -106,43 +107,11 @@ async function expandPatterns(
 	cwd: string,
 	patterns: string[],
 ): Promise<string[]> {
-	const explicitFiles: string[] = [];
-	const globPatterns: string[] = [];
-
-	for (const pattern of patterns) {
-		if (
-			pattern.includes("*") ||
-			pattern.includes("?") ||
-			pattern.includes("[")
-		) {
-			globPatterns.push(pattern);
-		} else {
-			const fullPath = path.resolve(cwd, pattern);
-			if (fileExists(fullPath)) {
-				explicitFiles.push(pattern);
-			}
-		}
-	}
-
-	if (globPatterns.length === 0) {
-		return explicitFiles;
-	}
-
-	const globResults = await glob(globPatterns, {
+	return glob(patterns, {
 		cwd,
 		absolute: false,
 		ignore: DEFAULT_IGNORE_PATTERNS,
 	});
-
-	if (explicitFiles.length === 0) {
-		return globResults;
-	}
-
-	const fileSet = new Set(explicitFiles);
-	for (const file of globResults) {
-		fileSet.add(file);
-	}
-	return Array.from(fileSet);
 }
 
 async function discoverFilesFromConfig(
@@ -194,17 +163,11 @@ async function discoverFilesFromConfig(
 function extractContentPatterns(config: TailwindConfig): string[] {
 	if (!config.content) return [];
 
-	if (Array.isArray(config.content)) {
-		return config.content.filter((p): p is string => typeof p === "string");
-	}
+	const content = Array.isArray(config.content)
+		? config.content
+		: config.content.files || [];
 
-	if (config.content.files) {
-		return config.content.files.filter(
-			(p): p is string => typeof p === "string",
-		);
-	}
-
-	return [];
+	return content.filter((p): p is string => typeof p === "string");
 }
 
 function extractSourcePatterns(cssContent: string): string[] {
@@ -230,23 +193,18 @@ async function processFiles(
 	for (let i = 0; i < files.length; i += CONCURRENT_FILES) {
 		const batch = files.slice(i, i + CONCURRENT_FILES);
 
-		const batchPromises = batch.map(async (file, batchIndex) => {
-			const fileIndex = i + batchIndex;
-			if (onProgress) {
-				onProgress(fileIndex + 1, files.length, file);
-			}
+		const batchResults = await Promise.all(
+			batch.map(async (file, batchIndex) => {
+				if (onProgress) {
+					onProgress(i + batchIndex + 1, files.length, file);
+				}
+				return processFile(state, cwd, file, fix);
+			}),
+		);
 
-			const result = await processFile(state, cwd, file, fix);
-			return result;
-		});
-
-		const batchResults = await Promise.all(batchPromises);
-
-		for (const result of batchResults) {
-			if (result) {
-				results.push(result);
-			}
-		}
+		results.push(
+			...(batchResults.filter((r) => r !== null) as LintFileResult[]),
+		);
 	}
 
 	return results;
@@ -266,11 +224,10 @@ async function processFile(
 		return null;
 	}
 
-	let content = readFileSync(absolutePath);
+	const content = readFileSync(absolutePath);
 	let diagnostics = await validateDocument(state, absolutePath, content);
 
 	let fixedCount = 0;
-	let wasFixed = false;
 
 	if (fix && diagnostics.length > 0) {
 		const fixResult = await applyCodeActions(
@@ -282,17 +239,19 @@ async function processFile(
 
 		if (fixResult.changed) {
 			writeFileSync(absolutePath, fixResult.content);
-			content = fixResult.content;
-			wasFixed = true;
 			fixedCount = fixResult.fixedCount;
-			diagnostics = await validateDocument(state, absolutePath, content);
+			diagnostics = await validateDocument(
+				state,
+				absolutePath,
+				fixResult.content,
+			);
 		}
 	}
 
 	return {
 		path: path.relative(cwd, absolutePath),
 		diagnostics,
-		fixed: wasFixed,
+		fixed: fixedCount > 0,
 		fixedCount,
 	};
 }
