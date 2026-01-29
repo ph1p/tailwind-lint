@@ -26,9 +26,26 @@ export const V4_CSS_NAMES = [
 	"index.css",
 	"tailwind.css",
 	"globals.css",
+	"global.css",
+	"styles.css",
+	"style.css",
+	"main.css",
 ];
 
-export const V4_CSS_FOLDERS = ["./", "./src/", "./app/", "./styles/"];
+export const V4_CSS_FOLDERS = [
+	"./",
+	"./src/",
+	"./src/css/",
+	"./src/style/",
+	"./src/styles/",
+	"./app/",
+	"./app/css/",
+	"./app/style/",
+	"./app/styles/",
+	"./css/",
+	"./style/",
+	"./styles/",
+];
 
 export const LANGUAGE_MAP: Record<string, string> = {
 	".astro": "astro",

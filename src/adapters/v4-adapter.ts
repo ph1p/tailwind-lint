@@ -38,6 +38,11 @@ export async function loadV4DesignSystem(
 				css: string,
 				options: {
 					base: string;
+					loadModule?: (
+						id: string,
+						base: string,
+						type: "config" | "plugin",
+					) => Promise<{ base: string; module: unknown }>;
 					loadStylesheet: (
 						id: string,
 						base: string,
@@ -51,6 +56,24 @@ export async function loadV4DesignSystem(
 
 			const designSystem = await loadDesignSystem(cssContent, {
 				base: basePath,
+				async loadModule(
+					id: string,
+					base: string,
+					_type: "config" | "plugin",
+				): Promise<{ base: string; module: unknown }> {
+					try {
+						const modulePath = require.resolve(id, { paths: [base, cwd] });
+						const module = require(modulePath);
+						return {
+							base: path.dirname(modulePath),
+							module,
+						};
+					} catch (error) {
+						throw new Error(
+							`Failed to load module "${id}": ${error instanceof Error ? error.message : String(error)}`,
+						);
+					}
+				},
 				async loadStylesheet(
 					_id: string,
 					base: string,
