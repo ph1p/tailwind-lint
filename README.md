@@ -1,6 +1,6 @@
 # Tailwind CSS Linter (CLI)
 
-[![](https://img.shields.io/badge/Tailwind%20CSS%20Linter-v1.0.0-blue)](https://www.npmjs.com/package/tailwind-lint) ![](https://github.com/ph1p/tailwind-lint/actions/workflows/ci.yml/badge.svg) ![](https://github.com/ph1p/tailwind-lint/actions/workflows/release.yml/badge.svg)
+[![](https://img.shields.io/npm/v/tailwind-lint)](https://www.npmjs.com/package/tailwind-lint) ![](https://github.com/ph1p/tailwind-lint/actions/workflows/ci.yml/badge.svg) ![](https://github.com/ph1p/tailwind-lint/actions/workflows/release.yml/badge.svg)
 
 It just lints your Tailwind project as the IDE will do, just on the command line.
 Supports **Tailwind CSS v4** (CSS-based config) and **v3** (JavaScript config, legacy).
