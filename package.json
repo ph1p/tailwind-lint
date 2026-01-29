@@ -1,6 +1,6 @@
 {
 	"name": "tailwind-lint",
-	"version": "0.5.0",
+	"version": "0.5.1",
 	"description": "A command-line tool that uses the Tailwind CSS IntelliSense plugin to show linting suggestions for your Tailwind CSS classes",
 	"keywords": [
 		"tailwindcss",
