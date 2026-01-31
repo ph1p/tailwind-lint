@@ -17,6 +17,7 @@ export function createEditorState(cwd: string) {
 			tabSize: DEFAULT_TAB_SIZE,
 		},
 		tailwindCSS: {
+			validate: true,
 			inspectPort: null,
 			emmetCompletions: false,
 			includeLanguages: {},
@@ -36,7 +37,6 @@ export function createEditorState(cwd: string) {
 			hovers: true,
 			codeLens: false,
 			suggestions: true,
-			validate: true,
 			colorDecorators: true,
 			rootFontSize: DEFAULT_ROOT_FONT_SIZE,
 			showPixelEquivalents: true,

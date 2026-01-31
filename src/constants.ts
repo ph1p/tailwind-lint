@@ -12,7 +12,8 @@ export const DEFAULT_IGNORE_PATTERNS = [
 	"**/.DS_Store/**",
 ];
 
-export const DEFAULT_FILE_PATTERN = "./**/*.{js,jsx,ts,tsx,html}";
+export const DEFAULT_FILE_PATTERN =
+	"./**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}";
 
 export const V3_CONFIG_PATHS = [
 	"tailwind.config.js",

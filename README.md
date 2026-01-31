@@ -48,9 +48,11 @@ tailwind-lint --verbose
 ### How Auto-Discovery Works
 
 **Tailwind CSS v4:**
-- Finds CSS config files: `app.css`, `src/app.css`, `index.css`, `src/index.css`, `tailwind.css`, `src/tailwind.css`
+- Finds CSS config files in common locations: `app.css`, `index.css`, `tailwind.css`, `global.css`, etc.
+- Searches in project root and subdirectories: `./`, `./src/`, `./src/styles/`, `./app/`, etc.
 - Uses file patterns from `@source` directives if present
-- Falls back to default pattern: `./**/*.{js,jsx,ts,tsx,html}`
+- Falls back to default pattern: `./**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}`
+- **Note:** When CSS config is in a subdirectory (e.g., `src/styles/global.css`), files are discovered from the project root
 
 **Tailwind CSS v3:**
 - Finds JavaScript config files: `tailwind.config.js`, `tailwind.config.cjs`, `tailwind.config.mjs`, `tailwind.config.ts`
@@ -126,7 +128,7 @@ Files are written atomically with multiple iterations to ensure all fixes are ap
 ## Features
 
 **Core (v3 & v4):**
-- CSS Conflicts - Detects when multiple classes apply the same CSS properties
+- CSS Conflicts - Detects when multiple classes apply the same CSS properties (e.g., `block flex`, `text-left text-center`) - **Note:** Works reliably in v4, limited support in v3 - no autofix
 - Invalid @apply Usage - Validates if a class can be used with `@apply`
 - Invalid @screen References - Detects references to non-existent breakpoints
 - Invalid Config Paths - Validates references in `config()` and `theme()` functions

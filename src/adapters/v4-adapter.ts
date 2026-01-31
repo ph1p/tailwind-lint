@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
 import chalk from "chalk";
+import postcss from "postcss";
 import type { DesignSystem } from "../types";
 import { AdapterLoadError } from "../types";
 import { fileExists, readFileSync } from "../utils/fs";
@@ -116,20 +117,22 @@ export async function loadV4DesignSystem(
 			Object.assign(designSystem, {
 				dependencies: () => new Set<string>(),
 
-				compile(classes: string[]): unknown[][] {
-					const results = designSystem.candidatesToAst
-						? designSystem.candidatesToAst(classes)
-						: designSystem.candidatesToCss?.(classes) || [];
+				compile(classes: string[]): unknown[] {
+					if (designSystem.candidatesToCss) {
+						const results = designSystem.candidatesToCss(classes);
+						return results.map((result: unknown) => {
+							if (typeof result === "string" && result.length > 0) {
+								try {
+									return postcss.parse(result);
+								} catch {
+									return postcss.root();
+								}
+							}
+							return postcss.root();
+						});
+					}
 
-					return results.map((result: unknown) => {
-						if (Array.isArray(result)) {
-							return result;
-						}
-						if (result === null) {
-							return [];
-						}
-						return [];
-					});
+					return classes.map(() => postcss.root());
 				},
 			});
 

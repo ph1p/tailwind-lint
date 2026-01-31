@@ -56,6 +56,9 @@ async function validateDocument(
 		const message = error instanceof Error ? error.message : String(error);
 
 		if (message.includes("Cannot read") || message.includes("undefined")) {
+			if (process.env.DEBUG) {
+				console.error(`Debug: Language service error for ${filePath}:`, error);
+			}
 			console.warn(
 				`Warning: Language service crashed while validating ${filePath}. Skipping this file.`,
 			);
@@ -119,11 +122,16 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 		return expandPatterns(cwd, patterns);
 	}
 
+	const configDir = path.dirname(configFilePath);
 	const cssContent = readFileSync(configFilePath);
 	const sourcePatterns = extractSourcePatterns(cssContent);
 
 	if (sourcePatterns.length > 0) {
-		return expandPatterns(cwd, sourcePatterns);
+		const resolvedPatterns = sourcePatterns.map((pattern) => {
+			const absolutePattern = path.resolve(configDir, pattern);
+			return path.relative(cwd, absolutePattern);
+		});
+		return expandPatterns(cwd, resolvedPatterns);
 	}
 
 	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN]);

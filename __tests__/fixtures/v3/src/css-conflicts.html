@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSS Conflicts Test - Tailwind v3</title>
+</head>
+<body>
+    <!-- Display property conflicts -->
+    <div class="block flex">Display conflict: block and flex</div>
+    <div class="inline inline-block">Display conflict: inline and inline-block</div>
+    <div class="hidden block">Display conflict: hidden and block</div>
+
+    <!-- Position property conflicts -->
+    <div class="static fixed">Position conflict: static and fixed</div>
+    <div class="relative absolute">Position conflict: relative and absolute</div>
+    <div class="static sticky">Position conflict: static and sticky</div>
+
+    <!-- Text alignment conflicts -->
+    <div class="text-left text-center">Text alignment conflict</div>
+    <div class="text-right text-justify">Text alignment conflict</div>
+
+    <!-- Flex direction conflicts -->
+    <div class="flex-row flex-col">Flex direction conflict</div>
+
+    <!-- Overflow conflicts -->
+    <div class="overflow-auto overflow-hidden">Overflow conflict</div>
+
+    <!-- No conflicts - these should not be flagged -->
+    <div class="flex items-center justify-center">No conflicts</div>
+    <div class="text-blue-500 bg-white p-4">No conflicts</div>
+</body>
+</html>

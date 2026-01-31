@@ -73,6 +73,34 @@ export async function loadV3ClassMetadata(
 		}
 
 		extractConfigMetadata(state);
+
+		if (!state.classNames) {
+			state.classNames = {
+				context: {},
+				classNames: {},
+			} as unknown as typeof state.classNames;
+		}
+
+		if (state.modules?.jit?.createContext && state.config) {
+			try {
+				state.jitContext = state.modules.jit.createContext.module(state.config);
+				if (verbose) {
+					console.log(chalk.dim("  ✓ Created JIT context"));
+				}
+			} catch (contextError) {
+				if (verbose) {
+					const message =
+						contextError instanceof Error
+							? contextError.message
+							: String(contextError);
+					console.log(
+						chalk.yellow(
+							`  ⚠ Warning: Could not create JIT context: ${message}`,
+						),
+					);
+				}
+			}
+		}
 	} catch (error) {
 		if (error instanceof Error) {
 			throw new AdapterLoadError("v3", error);
