@@ -1,6 +1,11 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
-import { V3_CONFIG_PATHS, V4_CSS_FOLDERS, V4_CSS_NAMES } from "../constants";
+import {
+	TAILWIND_V4_IMPORT_REGEX,
+	V3_CONFIG_PATHS,
+	V4_CSS_FOLDERS,
+	V4_CSS_NAMES,
+} from "../constants";
 import type { TailwindConfig } from "../types";
 import { fileExists, readFileSync } from "./fs";
 
@@ -92,10 +97,7 @@ export async function findTailwindConfigPath(
 			try {
 				const content = readFileSync(fullPath);
 				// Verify it's a valid Tailwind v4 CSS config
-				if (
-					content.includes('@import "tailwindcss"') ||
-					content.includes("@import 'tailwindcss'")
-				) {
+				if (TAILWIND_V4_IMPORT_REGEX.test(content)) {
 					return fullPath;
 				}
 			} catch {

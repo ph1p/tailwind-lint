@@ -23,7 +23,12 @@ import {
 	isCssConfigFile,
 	loadTailwindConfig,
 } from "./utils/config";
-import { fileExists, readFileSync, writeFileSync } from "./utils/fs";
+import {
+	fileExists,
+	readFileSync,
+	readGitignorePatterns,
+	writeFileSync,
+} from "./utils/fs";
 
 async function validateDocument(
 	state: State,
@@ -81,11 +86,15 @@ async function discoverFiles(
 	return expandPatterns(cwd, patterns);
 }
 
-async function expandPatterns(cwd: string, patterns: string[]) {
+async function expandPatterns(
+	cwd: string,
+	patterns: string[],
+	extraIgnore: string[] = [],
+) {
 	return glob(patterns, {
 		cwd,
 		absolute: false,
-		ignore: DEFAULT_IGNORE_PATTERNS,
+		ignore: [...DEFAULT_IGNORE_PATTERNS, ...extraIgnore],
 	});
 }
 
@@ -124,17 +133,23 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 
 	const configDir = path.dirname(configFilePath);
 	const cssContent = readFileSync(configFilePath);
-	const sourcePatterns = extractSourcePatterns(cssContent);
+	const { include, exclude } = extractSourcePatterns(cssContent);
 
-	if (sourcePatterns.length > 0) {
-		const resolvedPatterns = sourcePatterns.map((pattern) => {
-			const absolutePattern = path.resolve(configDir, pattern);
-			return path.relative(cwd, absolutePattern);
-		});
-		return expandPatterns(cwd, resolvedPatterns);
+	const resolveFromConfig = (pattern: string) => {
+		const absolutePattern = path.resolve(configDir, pattern);
+		return path.relative(cwd, absolutePattern);
+	};
+
+	const resolvedExclude = exclude.map(resolveFromConfig);
+	const gitignorePatterns = readGitignorePatterns(cwd);
+	const extraIgnore = [...resolvedExclude, ...gitignorePatterns];
+
+	if (include.length > 0) {
+		const resolvedPatterns = include.map(resolveFromConfig);
+		return expandPatterns(cwd, resolvedPatterns, extraIgnore);
 	}
 
-	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN]);
+	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN], extraIgnore);
 }
 
 function extractContentPatterns(config: TailwindConfig) {
@@ -148,14 +163,24 @@ function extractContentPatterns(config: TailwindConfig) {
 }
 
 function extractSourcePatterns(cssContent: string) {
-	const patterns: string[] = [];
-	const sourceRegex = /@source\s+["']([^"']+)["']/g;
+	const include: string[] = [];
+	const exclude: string[] = [];
+	const sourceRegex = /@source\s+(not\s+)?(?:inline\(|["']([^"']+)["'])/g;
 
 	for (const match of cssContent.matchAll(sourceRegex)) {
-		patterns.push(match[1]);
+		const isNot = !!match[1];
+		const filePath = match[2];
+
+		if (!filePath) continue;
+
+		if (isNot) {
+			exclude.push(filePath);
+		} else {
+			include.push(filePath);
+		}
 	}
 
-	return patterns;
+	return { include, exclude };
 }
 
 async function processFiles(
@@ -249,6 +274,7 @@ async function initializeState(
 	}
 }
 
+export { extractSourcePatterns };
 export type { LintFileResult, LintOptions, LintResult };
 
 export async function lint({
