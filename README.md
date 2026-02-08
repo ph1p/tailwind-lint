@@ -48,6 +48,7 @@ tailwind-lint --verbose
 ### How Auto-Discovery Works
 
 **Tailwind CSS v4:**
+
 - Finds CSS config files in common locations: `app.css`, `index.css`, `tailwind.css`, `global.css`, etc.
 - Searches in project root and subdirectories: `./`, `./src/`, `./src/styles/`, `./app/`, etc.
 - Uses file patterns from `@source` directives if present
@@ -55,6 +56,7 @@ tailwind-lint --verbose
 - **Note:** When CSS config is in a subdirectory (e.g., `src/styles/global.css`), files are discovered from the project root
 
 **Tailwind CSS v3:**
+
 - Finds JavaScript config files: `tailwind.config.js`, `tailwind.config.cjs`, `tailwind.config.mjs`, `tailwind.config.ts`
 - Uses file patterns from the `content` array in your config
 
@@ -93,7 +95,7 @@ Create a CSS config file (`app.css`, `index.css`, or `tailwind.css`):
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #3b82f6;
+	--color-primary: #3b82f6;
 }
 
 @source "./src/**/*.{js,jsx,ts,tsx,html}";
@@ -108,12 +110,12 @@ Create a JavaScript config file (`tailwind.config.js`):
 ```javascript
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./src/**/*.{js,jsx,ts,tsx}'],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-}
+	content: ["./src/**/*.{js,jsx,ts,tsx}"],
+	theme: {
+		extend: {},
+	},
+	plugins: [],
+};
 ```
 
 ## Autofix
@@ -128,6 +130,7 @@ Files are written atomically with multiple iterations to ensure all fixes are ap
 ## Features
 
 **Core (v3 & v4):**
+
 - CSS Conflicts - Detects when multiple classes apply the same CSS properties (e.g., `block flex`, `text-left text-center`) - **Note:** Works reliably in v4, limited support in v3 - no autofix
 - Invalid @apply Usage - Validates if a class can be used with `@apply`
 - Invalid @screen References - Detects references to non-existent breakpoints
@@ -138,6 +141,7 @@ Files are written atomically with multiple iterations to ensure all fixes are ap
 - Autofix - Automatically fix issues with `--fix` flag
 
 **v4-Specific:**
+
 - Canonical Class Suggestions - Suggests shorthand equivalents for arbitrary values (e.g., `top-[60px]` → `top-15`)
 - Invalid @source Directives - Validates `@source` directive paths
 - Full theme loading - Automatically loads Tailwind's default theme
