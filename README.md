@@ -65,6 +65,7 @@ tailwind-lint --verbose
 - `-c, --config <path>` - Path to Tailwind config file (default: auto-discover)
 - `-a, --auto` - Auto-discover files from config content patterns (legacy, enabled by default)
 - `--fix` - Automatically fix problems that can be fixed
+- `--format <text|json>` - Output format (`text` default, `json` for machine-readable output)
 - `-v, --verbose` - Enable verbose logging for debugging
 - `-h, --help` - Show help message
 - `--version` - Show version number
@@ -83,7 +84,32 @@ tailwind-lint "**/*.vue" --fix
 
 # Lint with a specific CSS config (v4)
 tailwind-lint --config ./styles/app.css
+
+# Machine-readable output for LLMs/agents
+tailwind-lint --auto --format json
 ```
+
+## LLM / Agent Integration
+
+Use JSON output to avoid brittle text parsing:
+
+```bash
+tailwind-lint --auto --format json
+```
+
+The JSON payload includes:
+
+- `ok` - `true` when no errors are found
+- `summary` - counts for `errors`, `warnings`, `fixed`, `filesWithIssues`, `totalFilesProcessed`
+- `config` - resolved runtime values (`cwd`, `configPath`, `autoDiscover`, `fix`, `patterns`)
+- `files[]` - per-file diagnostics with 1-based `line`/`column` ranges
+
+Typical agent flow:
+
+1. Run `tailwind-lint --auto --format json`.
+2. If `summary.errors > 0`, fail the check and surface diagnostics.
+3. If only warnings exist, optionally continue and open a cleanup task.
+4. Re-run with `--fix` when autofix is allowed.
 
 ## Configuration
 
@@ -172,4 +198,25 @@ pnpm format
 
 # Check code without fixing
 pnpm lint
+
+# Preview next version locally (no publish)
+pnpm release:dry
 ```
+
+## Releases
+
+Releases are automated with Semantic Release on pushes to `main`.
+
+- Version bump is derived from Conventional Commits.
+- npm release and GitHub release are generated automatically.
+- npm publish uses npm Trusted Publishing (OIDC), no `NPM_TOKEN` required.
+
+Commit examples:
+
+- `feat: add json output mode` -> minor release
+- `fix: resolve v4 config discovery in monorepos` -> patch release
+- `feat: drop Node 20 support` + commit body `BREAKING CHANGE: Node 20 is no longer supported` -> major release
+- `perf: speed up config discovery` -> patch release
+- `docs: update readme` -> no release
+
+`pnpm release:dry` runs against the local repo metadata (`--repository-url .`) so it does not require GitHub remote access.

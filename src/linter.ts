@@ -91,11 +91,12 @@ async function expandPatterns(
 	patterns: string[],
 	extraIgnore: string[] = [],
 ) {
-	return glob(patterns, {
+	const files = await glob(patterns, {
 		cwd,
 		absolute: false,
 		ignore: [...DEFAULT_IGNORE_PATTERNS, ...extraIgnore],
 	});
+	return [...new Set(files)].sort((a, b) => a.localeCompare(b));
 }
 
 async function discoverFilesFromConfig(cwd: string, configPath?: string) {
@@ -134,6 +135,7 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 	const configDir = path.dirname(configFilePath);
 	const cssContent = readFileSync(configFilePath);
 	const { include, exclude } = extractSourcePatterns(cssContent);
+	const importSource = extractImportSourceDirectives(cssContent);
 
 	const resolveFromConfig = (pattern: string) => {
 		const absolutePattern = path.resolve(configDir, pattern);
@@ -147,6 +149,19 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 	if (include.length > 0) {
 		const resolvedPatterns = include.map(resolveFromConfig);
 		return expandPatterns(cwd, resolvedPatterns, extraIgnore);
+	}
+
+	if (importSource.roots.length > 0) {
+		const sourcePatterns = importSource.roots.map((root) =>
+			resolveFromConfig(
+				path.join(root, "**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}"),
+			),
+		);
+		return expandPatterns(cwd, sourcePatterns, extraIgnore);
+	}
+
+	if (importSource.disableAutoSource) {
+		return [];
 	}
 
 	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN], extraIgnore);
@@ -181,6 +196,33 @@ function extractSourcePatterns(cssContent: string) {
 	}
 
 	return { include, exclude };
+}
+
+function extractImportSourceDirectives(cssContent: string) {
+	const roots: string[] = [];
+	let disableAutoSource = false;
+	const importSourceRegex =
+		/@import\s+["']tailwindcss(?:[^;]*?)\ssource\(\s*(none|["'][^"']+["'])\s*\)/g;
+
+	for (const match of cssContent.matchAll(importSourceRegex)) {
+		const raw = match[1];
+		if (!raw) continue;
+
+		if (raw === "none") {
+			disableAutoSource = true;
+			continue;
+		}
+
+		const sourceRoot = raw.slice(1, -1).trim();
+		if (sourceRoot.length > 0) {
+			roots.push(sourceRoot);
+		}
+	}
+
+	return {
+		roots: [...new Set(roots)],
+		disableAutoSource,
+	};
 }
 
 async function processFiles(
@@ -274,7 +316,7 @@ async function initializeState(
 	}
 }
 
-export { extractSourcePatterns };
+export { extractImportSourceDirectives, extractSourcePatterns };
 export type { LintFileResult, LintOptions, LintResult };
 
 export async function lint({

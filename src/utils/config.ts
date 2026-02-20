@@ -1,6 +1,8 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
+import glob from "fast-glob";
 import {
+	DEFAULT_IGNORE_PATTERNS,
 	TAILWIND_V4_IMPORT_REGEX,
 	V3_CONFIG_PATHS,
 	V4_CSS_FOLDERS,
@@ -10,6 +12,7 @@ import type { TailwindConfig } from "../types";
 import { fileExists, readFileSync } from "./fs";
 
 const require = createRequire(import.meta.url || __filename);
+const CONFIG_DISCOVERY_MAX_DEPTH = 8;
 
 export const isCssConfigFile = (filePath: string) => filePath.endsWith(".css");
 
@@ -86,6 +89,20 @@ export async function findTailwindConfigPath(
 		}
 	}
 
+	// Fallback: search for v3 config files recursively
+	const v3Recursive = await glob(
+		V3_CONFIG_PATHS.map((p) => `**/${p}`),
+		{
+			cwd,
+			absolute: true,
+			ignore: DEFAULT_IGNORE_PATTERNS,
+			deep: CONFIG_DISCOVERY_MAX_DEPTH,
+		},
+	);
+	if (v3Recursive.length > 0) {
+		return sortByPathDepth(v3Recursive)[0];
+	}
+
 	// Search for v4 CSS config files
 	const v4Paths = V4_CSS_FOLDERS.flatMap((folder) =>
 		V4_CSS_NAMES.map((name) => path.join(folder, name)),
@@ -107,5 +124,69 @@ export async function findTailwindConfigPath(
 		}
 	}
 
+	// Fallback: search recursively for CSS files that import tailwindcss
+	const cssCandidates = await glob("**/*.css", {
+		cwd,
+		absolute: true,
+		ignore: DEFAULT_IGNORE_PATTERNS,
+		deep: CONFIG_DISCOVERY_MAX_DEPTH,
+	});
+
+	const v4Matches: string[] = [];
+	for (const candidate of cssCandidates) {
+		try {
+			const content = readFileSync(candidate);
+			if (TAILWIND_V4_IMPORT_REGEX.test(content)) {
+				v4Matches.push(candidate);
+			}
+		} catch {
+			// Skip unreadable files during scan
+		}
+	}
+
+	if (v4Matches.length > 0) {
+		return sortCssCandidates(cwd, v4Matches)[0];
+	}
+
 	return null;
+}
+
+function sortByPathDepth(paths: string[]) {
+	return [...paths].sort((a, b) => {
+		const depthA = splitDepth(a);
+		const depthB = splitDepth(b);
+		if (depthA !== depthB) return depthA - depthB;
+		return a.localeCompare(b);
+	});
+}
+
+function sortCssCandidates(cwd: string, paths: string[]) {
+	return [...paths].sort((a, b) => {
+		const scoreA = cssCandidateScore(cwd, a);
+		const scoreB = cssCandidateScore(cwd, b);
+		if (scoreA !== scoreB) return scoreA - scoreB;
+		return a.localeCompare(b);
+	});
+}
+
+function cssCandidateScore(cwd: string, candidate: string) {
+	const relative = path.relative(cwd, candidate);
+	const normalized = relative.split(path.sep).join("/");
+	const base = path.basename(candidate);
+	const depth = splitDepth(normalized);
+
+	const nameScore = V4_CSS_NAMES.includes(base) ? 0 : 20;
+	const folderScore = isPreferredCssFolder(normalized) ? 0 : 10;
+
+	return depth * 100 + nameScore + folderScore;
+}
+
+function isPreferredCssFolder(relativePath: string) {
+	const folder = path.dirname(relativePath).replace(/\\/g, "/");
+	const withSlash = folder === "." ? "./" : `./${folder}/`;
+	return V4_CSS_FOLDERS.includes(withSlash);
+}
+
+function splitDepth(value: string) {
+	return value.split(/[\\/]/).filter(Boolean).length;
 }

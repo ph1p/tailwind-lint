@@ -4,7 +4,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import chalk from "chalk";
 import { Command } from "commander";
-import type { Diagnostic } from "vscode-languageserver";
 import {
 	DEFAULT_FILE_PATTERN,
 	DEFAULT_VERSION,
@@ -13,30 +12,17 @@ import {
 	TERMINAL_WIDTH,
 } from "./constants";
 import { lint } from "./linter";
+import { countBySeverity, createJsonOutput } from "./output";
 import type { LintFileResult } from "./types";
 
 const MAX_FILENAME_DISPLAY_LENGTH = 50;
-
-function countDiagnosticsBySeverity(diagnostics: Diagnostic[]): {
-	errors: number;
-	warnings: number;
-} {
-	let errors = 0;
-	let warnings = 0;
-
-	for (const diagnostic of diagnostics) {
-		if (diagnostic.severity === SEVERITY.ERROR) errors++;
-		if (diagnostic.severity === SEVERITY.WARNING) warnings++;
-	}
-
-	return { errors, warnings };
-}
 
 interface CliOptions {
 	config?: string;
 	auto?: boolean;
 	fix?: boolean;
 	verbose?: boolean;
+	format?: "text" | "json";
 }
 
 function resolveOptions(files: string[], options: CliOptions) {
@@ -98,7 +84,7 @@ async function displayResults(files: LintFileResult[], fixMode: boolean) {
 				totalFixed += file.fixedCount || 0;
 			}
 
-			const { errors, warnings } = countDiagnosticsBySeverity(file.diagnostics);
+			const { errors, warnings } = countBySeverity(file.diagnostics);
 			totalErrors += errors;
 			totalWarnings += warnings;
 
@@ -221,6 +207,7 @@ program
 	)
 	.option("--fix", "Automatically fix problems that can be fixed")
 	.option("-v, --verbose", "Enable verbose logging for debugging")
+	.option("--format <format>", "Output format: text or json", "text")
 	.addHelpText(
 		"after",
 		`
@@ -250,9 +237,11 @@ ${chalk.bold.cyan("Notes:")}
 		}
 
 		const resolved = resolveOptions(files, options);
+		const format = options.format === "json" ? "json" : "text";
+		const isJsonOutput = format === "json";
 
 		try {
-			if (resolved.verbose) {
+			if (resolved.verbose && !isJsonOutput) {
 				console.log(chalk.cyan.bold("→ Configuration"));
 				console.log(chalk.dim(`  Working directory: ${resolved.cwd}`));
 				console.log(
@@ -270,6 +259,8 @@ ${chalk.bold.cyan("Notes:")}
 			const results = await lint({
 				...resolved,
 				onProgress: (current, total, file) => {
+					if (isJsonOutput) return;
+
 					if (process.stdout.isTTY && !resolved.verbose) {
 						const displayFile = truncateFilename(file);
 						process.stdout.write(
@@ -281,22 +272,58 @@ ${chalk.bold.cyan("Notes:")}
 				},
 			});
 
-			if (process.stdout.isTTY && !resolved.verbose) {
+			if (process.stdout.isTTY && !resolved.verbose && !isJsonOutput) {
 				process.stdout.write(`\r${" ".repeat(TERMINAL_WIDTH)}\r`);
 			}
 
 			if (results.totalFilesProcessed === 0) {
-				console.log();
-				console.log(chalk.yellow("⚠ No files found to lint"));
+				if (isJsonOutput) {
+					console.log(
+						JSON.stringify(
+							createJsonOutput({
+								...resolved,
+								files: [],
+								totalFilesProcessed: 0,
+							}),
+						),
+					);
+				} else {
+					console.log();
+					console.log(chalk.yellow("⚠ No files found to lint"));
+				}
 				process.exit(0);
 			}
 
 			if (results.files.length === 0) {
-				console.log(chalk.green.bold("✔ No issues found"));
+				if (isJsonOutput) {
+					console.log(
+						JSON.stringify(
+							createJsonOutput({
+								...resolved,
+								files: [],
+								totalFilesProcessed: results.totalFilesProcessed,
+							}),
+						),
+					);
+				} else {
+					console.log(chalk.green.bold("✔ No issues found"));
+				}
 				process.exit(0);
 			}
 
-			await displayResults(results.files, resolved.fix);
+			if (isJsonOutput) {
+				console.log(
+					JSON.stringify(
+						createJsonOutput({
+							...resolved,
+							files: results.files,
+							totalFilesProcessed: results.totalFilesProcessed,
+						}),
+					),
+				);
+			} else {
+				await displayResults(results.files, resolved.fix);
+			}
 
 			const hasErrors = results.files.some((file) =>
 				file.diagnostics.some((d) => d.severity === SEVERITY.ERROR),
@@ -305,9 +332,18 @@ ${chalk.bold.cyan("Notes:")}
 		} catch (error) {
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
-			console.error(chalk.red("✖ Error:"), errorMessage);
+			if (isJsonOutput) {
+				console.log(
+					JSON.stringify({
+						ok: false,
+						error: errorMessage,
+					}),
+				);
+			} else {
+				console.error(chalk.red("✖ Error:"), errorMessage);
+			}
 
-			if (resolved.verbose && error instanceof Error) {
+			if (resolved.verbose && error instanceof Error && !isJsonOutput) {
 				console.error(chalk.dim("\nStack trace:"));
 				console.error(chalk.dim(error.stack || error.toString()));
 			}

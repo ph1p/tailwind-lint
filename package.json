@@ -50,6 +50,8 @@
 		"lint": "oxlint .",
 		"lint:fix": "oxlint --fix .",
 		"prepublishOnly": "pnpm build && pnpm test",
+		"release": "pnpm dlx semantic-release",
+		"release:dry": "SEMREL_LOCAL=1 pnpm dlx semantic-release --dry-run --no-ci --repository-url .",
 		"start": "node dist/cli.cjs",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage",
@@ -64,9 +66,9 @@
 		"vscode-languageserver-textdocument": "^1.0.12"
 	},
 	"devDependencies": {
-		"@types/node": "^25.2.2",
-		"oxfmt": "^0.28.0",
-		"oxlint": "^1.43.0",
+		"@types/node": "^25.3.0",
+		"oxfmt": "^0.34.0",
+		"oxlint": "^1.49.0",
 		"tsdown": "^0.20.3",
 		"typescript": "^5.9.3",
 		"vitest": "^4.0.18"
@@ -75,5 +77,5 @@
 		"node": ">=22.0.0",
 		"pnpm": ">=10.0.0"
 	},
-	"packageManager": "pnpm@10.29.1"
+	"packageManager": "pnpm@10.30.1"
 }

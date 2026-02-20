@@ -3,7 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TAILWIND_V4_IMPORT_REGEX } from "../src/constants";
-import { extractSourcePatterns } from "../src/linter";
+import {
+	extractImportSourceDirectives,
+	extractSourcePatterns,
+} from "../src/linter";
+import { findTailwindConfigPath } from "../src/utils/config";
 import { readGitignorePatterns } from "../src/utils/fs";
 
 describe("extractSourcePatterns", () => {
@@ -94,6 +98,28 @@ describe("extractSourcePatterns", () => {
 		const result = extractSourcePatterns(css);
 		expect(result.include).toEqual([]);
 		expect(result.exclude).toEqual([]);
+	});
+});
+
+describe("extractImportSourceDirectives", () => {
+	it("should extract source roots from @import directives", () => {
+		const css = `
+@import "tailwindcss" source("../src");
+@import "tailwindcss" source("./components");
+`;
+
+		expect(extractImportSourceDirectives(css)).toEqual({
+			roots: ["../src", "./components"],
+			disableAutoSource: false,
+		});
+	});
+
+	it("should detect source(none)", () => {
+		const css = `@import "tailwindcss" source(none);`;
+		expect(extractImportSourceDirectives(css)).toEqual({
+			roots: [],
+			disableAutoSource: true,
+		});
 	});
 });
 
@@ -220,5 +246,41 @@ describe("readGitignorePatterns", () => {
 		fs.writeFileSync(path.join(tmpDir, ".gitignore"), "vendor/**\n");
 		const patterns = readGitignorePatterns(tmpDir);
 		expect(patterns).toEqual(["vendor/**"]);
+	});
+});
+
+describe("findTailwindConfigPath", () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tailwind-config-test-"));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("should discover nested v3 config files recursively", async () => {
+		const nestedDir = path.join(tmpDir, "packages", "web");
+		fs.mkdirSync(nestedDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(nestedDir, "tailwind.config.js"),
+			"module.exports = { content: ['./src/**/*.tsx'] }",
+		);
+
+		const discovered = await findTailwindConfigPath(tmpDir);
+		expect(discovered).toBe(path.join(nestedDir, "tailwind.config.js"));
+	});
+
+	it("should discover nested v4 css configs recursively", async () => {
+		const nestedDir = path.join(tmpDir, "apps", "site", "styles");
+		fs.mkdirSync(nestedDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(nestedDir, "theme.css"),
+			'@import "tailwindcss";',
+		);
+
+		const discovered = await findTailwindConfigPath(tmpDir);
+		expect(discovered).toBe(path.join(nestedDir, "theme.css"));
 	});
 });
