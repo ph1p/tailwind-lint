@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
-import chalk from "chalk";
+import ansis from "ansis";
 import postcss from "postcss";
 import type { DesignSystem } from "../types";
 import { AdapterLoadError } from "../types";
@@ -146,7 +146,7 @@ export async function loadV4DesignSystem(
 			}
 
 			if (verbose) {
-				console.log(chalk.dim("  ✓ Loaded v4 design system"));
+				console.log(ansis.dim("  ✓ Loaded v4 design system"));
 			}
 		} else {
 			const error = new Error(

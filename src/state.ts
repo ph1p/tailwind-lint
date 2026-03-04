@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
-import chalk from "chalk";
+import ansis from "ansis";
 import { createEditorState } from "./adapters/editor-state-adapter";
 import { loadV3ClassMetadata } from "./adapters/v3-adapter";
 import { loadV4DesignSystem } from "./adapters/v4-adapter";
@@ -74,12 +74,12 @@ export async function createState(
 	const isV4 = isV4Config(version);
 
 	if (verbose) {
-		console.log(chalk.cyan.bold("→ Tailwind Configuration"));
-		console.log(chalk.dim(`  Version: ${version || "unknown"}`));
+		console.log(ansis.cyan.bold("→ Tailwind Configuration"));
+		console.log(ansis.dim(`  Version: ${version || "unknown"}`));
 		console.log(
-			chalk.dim(`  Config type: ${isCssConfig ? "CSS (v4)" : "JavaScript"}`),
+			ansis.dim(`  Config type: ${isCssConfig ? "CSS (v4)" : "JavaScript"}`),
 		);
-		console.log(chalk.dim(`  Config path: ${resolvedConfigPath}`));
+		console.log(ansis.dim(`  Config path: ${resolvedConfigPath}`));
 	}
 
 	let config: TailwindConfig = {};

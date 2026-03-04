@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import chalk from "chalk";
+import ansis from "ansis";
 import { Command } from "commander";
 import {
 	DEFAULT_FILE_PATTERN,
@@ -76,11 +76,11 @@ async function displayResults(files: LintFileResult[], fixMode: boolean) {
 			} else {
 				console.log();
 			}
-			console.log(chalk.underline.bold(file.path));
+			console.log(ansis.underline.bold(file.path));
 
 			if (fixMode && file.fixed) {
 				const issueText = `${file.fixedCount || 0} issue${file.fixedCount !== 1 ? "s" : ""}`;
-				console.log(chalk.green(`  ✔ Fixed ${issueText}`));
+				console.log(ansis.green(`  ✔ Fixed ${issueText}`));
 				totalFixed += file.fixedCount || 0;
 			}
 
@@ -99,12 +99,12 @@ async function displayResults(files: LintFileResult[], fixMode: boolean) {
 					diagnostic.severity === SEVERITY.ERROR ? "error" : "warning";
 				const severityColor =
 					diagnostic.severity === SEVERITY.ERROR
-						? chalk.red(severity)
-						: chalk.yellow(severity);
-				const code = diagnostic.code ? chalk.dim(`  (${diagnostic.code})`) : "";
+						? ansis.red(severity)
+						: ansis.yellow(severity);
+				const code = diagnostic.code ? ansis.dim(`  (${diagnostic.code})`) : "";
 
 				console.log(
-					`  ${chalk.dim(`${line}:${char}`)}  ${severityColor}  ${diagnostic.message}${code}`,
+					`  ${ansis.dim(`${line}:${char}`)}  ${severityColor}  ${diagnostic.message}${code}`,
 				);
 			}
 		}
@@ -115,9 +115,9 @@ async function displayResults(files: LintFileResult[], fixMode: boolean) {
 	if (totalErrors === 0 && totalWarnings === 0) {
 		if (totalFixed > 0) {
 			const issueText = `${totalFixed} issue${totalFixed !== 1 ? "s" : ""}`;
-			console.log(chalk.green.bold(`✔ Fixed ${issueText}`));
+			console.log(ansis.green.bold(`✔ Fixed ${issueText}`));
 		} else {
-			console.log(chalk.green.bold("✔ No issues found"));
+			console.log(ansis.green.bold("✔ No issues found"));
 		}
 	} else {
 		const parts = [];
@@ -133,7 +133,7 @@ async function displayResults(files: LintFileResult[], fixMode: boolean) {
 
 		if (totalFixed > 0) {
 			const issueText = `${totalFixed} issue${totalFixed !== 1 ? "s" : ""}`;
-			console.log(chalk.green.bold(`✔ Fixed ${issueText}`));
+			console.log(ansis.green.bold(`✔ Fixed ${issueText}`));
 			console.log(summary);
 		} else {
 			console.log(summary);
@@ -158,7 +158,7 @@ program.configureHelp({
 		const termWidth = helper.padWidth(cmd, helper);
 		let output = "";
 
-		output += `${chalk.bold.cyan("Usage:")} ${helper.commandUsage(cmd)}\n\n`;
+		output += `${ansis.bold.cyan("Usage:")} ${helper.commandUsage(cmd)}\n\n`;
 
 		if (cmd.description()) {
 			output += `${cmd.description()}\n\n`;
@@ -166,21 +166,21 @@ program.configureHelp({
 
 		const args = helper.visibleArguments(cmd);
 		if (args.length > 0) {
-			output += `${chalk.bold.cyan("Arguments:")}\n`;
+			output += `${ansis.bold.cyan("Arguments:")}\n`;
 			args.forEach((arg) => {
 				const argName = arg.required ? `<${arg.name()}>` : `[${arg.name()}]`;
-				output += `  ${chalk.green(argName.padEnd(termWidth))} ${arg.description}\n`;
+				output += `  ${ansis.green(argName.padEnd(termWidth))} ${arg.description}\n`;
 			});
 			output += "\n";
 		}
 
 		const options = helper.visibleOptions(cmd);
 		if (options.length > 0) {
-			output += `${chalk.bold.cyan("Options:")}\n`;
+			output += `${ansis.bold.cyan("Options:")}\n`;
 			options.forEach((option) => {
 				const flags = helper.optionTerm(option);
 				const description = helper.optionDescription(option);
-				output += `  ${chalk.yellow(flags.padEnd(termWidth))} ${description}\n`;
+				output += `  ${ansis.yellow(flags.padEnd(termWidth))} ${description}\n`;
 			});
 			output += "\n";
 		}
@@ -211,19 +211,19 @@ program
 	.addHelpText(
 		"after",
 		`
-${chalk.bold.cyan("Examples:")}
-  ${chalk.dim("$")} tailwind-lint
-  ${chalk.dim("$")} tailwind-lint ${chalk.green('"src/**/*.{js,jsx,ts,tsx}"')}
-  ${chalk.dim("$")} tailwind-lint ${chalk.yellow("--config")} ${chalk.green("./tailwind.config.js")}
-  ${chalk.dim("$")} tailwind-lint ${chalk.green('"src/**/*.tsx"')} ${chalk.yellow("--fix")}
-  ${chalk.dim("$")} tailwind-lint ${chalk.green('"**/*.vue"')}
+${ansis.bold.cyan("Examples:")}
+  ${ansis.dim("$")} tailwind-lint
+  ${ansis.dim("$")} tailwind-lint ${ansis.green('"src/**/*.{js,jsx,ts,tsx}"')}
+  ${ansis.dim("$")} tailwind-lint ${ansis.yellow("--config")} ${ansis.green("./tailwind.config.js")}
+  ${ansis.dim("$")} tailwind-lint ${ansis.green('"src/**/*.tsx"')} ${ansis.yellow("--fix")}
+  ${ansis.dim("$")} tailwind-lint ${ansis.green('"**/*.vue"')}
 
-${chalk.bold.cyan("Notes:")}
-  ${chalk.dim("•")} Running without arguments auto-discovers config and files
-  ${chalk.dim("•")} For v3: uses content patterns from tailwind.config.js
-  ${chalk.dim("•")} For v4: uses @source patterns from CSS config, or default pattern
-  ${chalk.dim("•")} Default pattern: ${chalk.dim("./**/*.{js,jsx,ts,tsx,html}")}
-  ${chalk.dim("•")} Use ${chalk.yellow("--fix")} to automatically resolve fixable issues
+${ansis.bold.cyan("Notes:")}
+  ${ansis.dim("•")} Running without arguments auto-discovers config and files
+  ${ansis.dim("•")} For v3: uses content patterns from tailwind.config.js
+  ${ansis.dim("•")} For v4: uses @source patterns from CSS config, or default pattern
+  ${ansis.dim("•")} Default pattern: ${ansis.dim("./**/*.{js,jsx,ts,tsx,html}")}
+  ${ansis.dim("•")} Use ${ansis.yellow("--fix")} to automatically resolve fixable issues
 `,
 	)
 	.action(async (files: string[], options) => {
@@ -242,14 +242,14 @@ ${chalk.bold.cyan("Notes:")}
 
 		try {
 			if (resolved.verbose && !isJsonOutput) {
-				console.log(chalk.cyan.bold("→ Configuration"));
-				console.log(chalk.dim(`  Working directory: ${resolved.cwd}`));
+				console.log(ansis.cyan.bold("→ Configuration"));
+				console.log(ansis.dim(`  Working directory: ${resolved.cwd}`));
 				console.log(
-					chalk.dim(`  Config path: ${resolved.configPath || "auto-discover"}`),
+					ansis.dim(`  Config path: ${resolved.configPath || "auto-discover"}`),
 				);
-				console.log(chalk.dim(`  Fix mode: ${resolved.fix}`));
+				console.log(ansis.dim(`  Fix mode: ${resolved.fix}`));
 				console.log(
-					chalk.dim(
+					ansis.dim(
 						`  Patterns: ${resolved.patterns.length > 0 ? resolved.patterns.join(", ") : "auto-discover"}`,
 					),
 				);
@@ -264,10 +264,10 @@ ${chalk.bold.cyan("Notes:")}
 					if (process.stdout.isTTY && !resolved.verbose) {
 						const displayFile = truncateFilename(file);
 						process.stdout.write(
-							`\r${chalk.cyan("→")} Linting files... ${chalk.dim(`(${current}/${total})`)} ${chalk.dim(displayFile)}${" ".repeat(TERMINAL_PADDING)}`,
+							`\r${ansis.cyan("→")} Linting files... ${ansis.dim(`(${current}/${total})`)} ${ansis.dim(displayFile)}${" ".repeat(TERMINAL_PADDING)}`,
 						);
 					} else if (resolved.verbose) {
-						console.log(chalk.dim(`  [${current}/${total}] Linting ${file}`));
+						console.log(ansis.dim(`  [${current}/${total}] Linting ${file}`));
 					}
 				},
 			});
@@ -289,7 +289,7 @@ ${chalk.bold.cyan("Notes:")}
 					);
 				} else {
 					console.log();
-					console.log(chalk.yellow("⚠ No files found to lint"));
+					console.log(ansis.yellow("⚠ No files found to lint"));
 				}
 				process.exit(0);
 			}
@@ -306,7 +306,7 @@ ${chalk.bold.cyan("Notes:")}
 						),
 					);
 				} else {
-					console.log(chalk.green.bold("✔ No issues found"));
+					console.log(ansis.green.bold("✔ No issues found"));
 				}
 				process.exit(0);
 			}
@@ -340,12 +340,12 @@ ${chalk.bold.cyan("Notes:")}
 					}),
 				);
 			} else {
-				console.error(chalk.red("✖ Error:"), errorMessage);
+				console.error(ansis.red("✖ Error:"), errorMessage);
 			}
 
 			if (resolved.verbose && error instanceof Error && !isJsonOutput) {
-				console.error(chalk.dim("\nStack trace:"));
-				console.error(chalk.dim(error.stack || error.toString()));
+				console.error(ansis.dim("\nStack trace:"));
+				console.error(ansis.dim(error.stack || error.toString()));
 			}
 			process.exit(1);
 		}

@@ -1,7 +1,7 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
-import chalk from "chalk";
+import ansis from "ansis";
 import type { ContextUtils, GenerateRulesModule } from "../types";
 import { AdapterLoadError } from "../types";
 
@@ -49,7 +49,7 @@ export async function loadV3ClassMetadata(
 			};
 
 			if (verbose) {
-				console.log(chalk.dim("  ✓ Loaded v3 JIT modules"));
+				console.log(ansis.dim("  ✓ Loaded v3 JIT modules"));
 			}
 		} catch (jitError) {
 			// JIT modules are optional - some v3 configs may not have them
@@ -58,7 +58,7 @@ export async function loadV3ClassMetadata(
 				const message =
 					jitError instanceof Error ? jitError.message : String(jitError);
 				console.log(
-					chalk.yellow(
+					ansis.yellow(
 						`  ⚠ Warning: Could not load v3 JIT modules: ${message}`,
 					),
 				);
@@ -85,7 +85,7 @@ export async function loadV3ClassMetadata(
 			try {
 				state.jitContext = state.modules.jit.createContext.module(state.config);
 				if (verbose) {
-					console.log(chalk.dim("  ✓ Created JIT context"));
+					console.log(ansis.dim("  ✓ Created JIT context"));
 				}
 			} catch (contextError) {
 				if (verbose) {
@@ -94,7 +94,7 @@ export async function loadV3ClassMetadata(
 							? contextError.message
 							: String(contextError);
 					console.log(
-						chalk.yellow(
+						ansis.yellow(
 							`  ⚠ Warning: Could not create JIT context: ${message}`,
 						),
 					);

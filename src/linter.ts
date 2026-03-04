@@ -1,8 +1,8 @@
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
 import { doValidate } from "@tailwindcss/language-service";
-import chalk from "chalk";
-import glob from "fast-glob";
+import ansis from "ansis";
+import { glob } from "tinyglobby";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import { applyCodeActions } from "./code-actions";
 import {
@@ -333,7 +333,7 @@ export async function lint({
 
 	if (verbose) {
 		console.log(
-			chalk.cyan.bold(
+			ansis.cyan.bold(
 				`→ Discovered ${files.length} file${files.length !== 1 ? "s" : ""} to lint`,
 			),
 		);

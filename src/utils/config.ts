@@ -1,6 +1,6 @@
 import { createRequire } from "node:module";
 import * as path from "node:path";
-import glob from "fast-glob";
+import { glob } from "tinyglobby";
 import {
 	DEFAULT_IGNORE_PATTERNS,
 	TAILWIND_V4_IMPORT_REGEX,
