@@ -9,6 +9,7 @@ import {
 	CONCURRENT_FILES,
 	DEFAULT_FILE_PATTERN,
 	DEFAULT_IGNORE_PATTERNS,
+	SYNTHETIC_VITE_CSS_CONFIG_CONTENT,
 	getLanguageId,
 } from "./constants";
 import { createState } from "./state";
@@ -133,7 +134,9 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 	}
 
 	const configDir = path.dirname(configFilePath);
-	const cssContent = readFileSync(configFilePath);
+	const cssContent = fileExists(configFilePath)
+		? readFileSync(configFilePath)
+		: SYNTHETIC_VITE_CSS_CONFIG_CONTENT;
 	const { include, exclude } = extractSourcePatterns(cssContent);
 	const importSource = extractImportSourceDirectives(cssContent);
 

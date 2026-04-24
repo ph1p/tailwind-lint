@@ -3,6 +3,7 @@ import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
 import ansis from "ansis";
 import postcss from "postcss";
+import { SYNTHETIC_VITE_CSS_CONFIG_CONTENT } from "../constants";
 import type { DesignSystem } from "../types";
 import { AdapterLoadError } from "../types";
 import { fileExists, readFileSync } from "../utils/fs";
@@ -32,7 +33,7 @@ export async function loadV4DesignSystem(
 			if (fileExists(configPath)) {
 				cssContent = readFileSync(configPath);
 			} else {
-				cssContent = '@import "tailwindcss";';
+				cssContent = SYNTHETIC_VITE_CSS_CONFIG_CONTENT;
 			}
 
 			type LoadDesignSystemFn = (

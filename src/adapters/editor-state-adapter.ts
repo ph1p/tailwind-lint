@@ -50,7 +50,9 @@ export function createEditorState(cwd: string) {
 			},
 			experimental: {
 				configFile: null,
-				classRegex: [],
+				classRegex: [
+					"[\"'`]([^\"'`]*\\b(?:bg|text|border|font|tracking|rounded|px|py|p|m|flex|grid|items|justify|gap|whitespace|overflow|align|leading|uppercase|lowercase|capitalize|shadow|transition|hover:|focus:)[^\"'`]*)[\"'`]",
+				],
 			},
 			lint: {
 				cssConflict: "warning",

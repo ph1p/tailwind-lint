@@ -51,7 +51,21 @@ export const V4_CSS_FOLDERS = [
 	"./styles/",
 	"./assets/css/",
 	"./resources/css/",
+	"./.ladle/",
 ];
+
+export const VITE_CONFIG_PATHS = [
+	"vite.config.js",
+	"vite.config.mjs",
+	"vite.config.cjs",
+	"vite.config.ts",
+	"vite.config.mts",
+	"vite.config.cts",
+];
+
+export const SYNTHETIC_VITE_CSS_CONFIG_NAME = ".tailwind-lint.vite.css";
+
+export const SYNTHETIC_VITE_CSS_CONFIG_CONTENT = '@import "tailwindcss";';
 
 export const LANGUAGE_MAP: Record<string, string> = {
 	".astro": "astro",
@@ -98,6 +112,9 @@ export const QUICKFIX_ACTION_KIND = "quickfix";
 
 export const TAILWIND_V4_IMPORT_REGEX =
 	/@import\s+["']tailwindcss(?:["'\s/]|$)/;
+
+export const TAILWIND_VITE_PLUGIN_REGEX =
+	/(?:from\s+["']@tailwindcss\/vite["']|require\(\s*["']@tailwindcss\/vite["']\s*\)|import\(\s*["']@tailwindcss\/vite["']\s*\))/;
 
 export const CSS_CONFIG_EXTENSION = ".css";
 

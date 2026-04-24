@@ -57,6 +57,7 @@ export async function createState(
 		throw new Error(
 			"Could not find Tailwind config file. Expected one of:\n" +
 				"  • Tailwind v4 (CSS): app.css, index.css, tailwind.css in project root or src/\n" +
+				"  • Tailwind v4 (Vite): vite.config.* with @tailwindcss/vite\n" +
 				"  • Tailwind v3 (JS): tailwind.config.js, tailwind.config.ts\n" +
 				"Run 'npx tailwindcss init' to create a config file.",
 		);

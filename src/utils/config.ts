@@ -3,10 +3,13 @@ import * as path from "node:path";
 import { glob } from "tinyglobby";
 import {
 	DEFAULT_IGNORE_PATTERNS,
+	SYNTHETIC_VITE_CSS_CONFIG_NAME,
 	TAILWIND_V4_IMPORT_REGEX,
+	TAILWIND_VITE_PLUGIN_REGEX,
 	V3_CONFIG_PATHS,
 	V4_CSS_FOLDERS,
 	V4_CSS_NAMES,
+	VITE_CONFIG_PATHS,
 } from "../constants";
 import type { TailwindConfig } from "../types";
 import { fileExists, readFileSync } from "./fs";
@@ -15,6 +18,13 @@ const require = createRequire(import.meta.url || __filename);
 const CONFIG_DISCOVERY_MAX_DEPTH = 8;
 
 export const isCssConfigFile = (filePath: string) => filePath.endsWith(".css");
+
+function syntheticViteCssConfigPath(viteConfigPath: string) {
+	return path.join(
+		path.dirname(viteConfigPath),
+		SYNTHETIC_VITE_CSS_CONFIG_NAME,
+	);
+}
 
 export async function loadTailwindConfig(
 	configPath: string,
@@ -148,7 +158,50 @@ export async function findTailwindConfigPath(
 		return sortCssCandidates(cwd, v4Matches)[0];
 	}
 
+	const viteConfigPath = await findTailwindViteConfigPath(cwd);
+	if (viteConfigPath) {
+		return syntheticViteCssConfigPath(viteConfigPath);
+	}
+
 	return null;
+}
+
+async function findTailwindViteConfigPath(cwd: string) {
+	for (const p of VITE_CONFIG_PATHS) {
+		const fullPath = path.join(cwd, p);
+		if (isTailwindViteConfig(fullPath)) {
+			return fullPath;
+		}
+	}
+
+	const viteCandidates = await glob(
+		VITE_CONFIG_PATHS.map((p) => `**/${p}`),
+		{
+			cwd,
+			absolute: true,
+			ignore: DEFAULT_IGNORE_PATTERNS,
+			deep: CONFIG_DISCOVERY_MAX_DEPTH,
+		},
+	);
+
+	const matches = viteCandidates.filter(isTailwindViteConfig);
+	if (matches.length === 0) {
+		return null;
+	}
+
+	return sortByPathDepth(matches)[0];
+}
+
+function isTailwindViteConfig(filePath: string) {
+	if (!fileExists(filePath)) {
+		return false;
+	}
+
+	try {
+		return TAILWIND_VITE_PLUGIN_REGEX.test(readFileSync(filePath));
+	} catch {
+		return false;
+	}
 }
 
 function sortByPathDepth(paths: string[]) {

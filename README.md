@@ -3,7 +3,7 @@
 [![](https://img.shields.io/npm/v/tailwind-lint)](https://www.npmjs.com/package/tailwind-lint) ![](https://github.com/ph1p/tailwind-lint/actions/workflows/ci.yml/badge.svg) ![](https://github.com/ph1p/tailwind-lint/actions/workflows/release.yml/badge.svg)
 
 It just lints your Tailwind project as the IDE will do, just on the command line.
-Supports **Tailwind CSS v4** (CSS-based config) and **v3** (JavaScript config, legacy).
+Supports **Tailwind CSS v4** (CSS config files and Vite projects using `@tailwindcss/vite`) and **v3** (JavaScript config, legacy).
 
 ## Installation
 
@@ -50,7 +50,9 @@ tailwind-lint --verbose
 **Tailwind CSS v4:**
 
 - Finds CSS config files in common locations: `app.css`, `index.css`, `tailwind.css`, `global.css`, etc.
-- Searches in project root and subdirectories: `./`, `./src/`, `./src/styles/`, `./app/`, etc.
+- Searches in project root and subdirectories: `./`, `./src/`, `./src/styles/`, `./app/`, `./.ladle/`, etc.
+- Detects `vite.config.*` files that use `@tailwindcss/vite`
+- Prefers real CSS configs when present, so custom `@theme` tokens and `@source` directives are available to diagnostics
 - Uses file patterns from `@source` directives if present
 - Falls back to default pattern: `./**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}`
 - **Note:** When CSS config is in a subdirectory (e.g., `src/styles/global.css`), files are discovered from the project root
@@ -84,6 +86,9 @@ tailwind-lint "**/*.vue" --fix
 
 # Lint with a specific CSS config (v4)
 tailwind-lint --config ./styles/app.css
+
+# Lint a Vite-based Tailwind v4 project
+tailwind-lint --auto
 
 # Machine-readable output for LLMs/agents
 tailwind-lint --auto --format json
@@ -129,6 +134,19 @@ Create a CSS config file (`app.css`, `index.css`, or `tailwind.css`):
 
 The CLI auto-detects configs at: `app.css`, `src/app.css`, `index.css`, `src/index.css`, `tailwind.css`, `src/tailwind.css`
 
+You can also use a Vite-based Tailwind v4 project with `@tailwindcss/vite` and no standalone Tailwind CSS config file:
+
+```ts
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [tailwindcss()],
+});
+```
+
+If a real CSS config is also present, for example `.ladle/styles.css`, the CLI uses that file so custom `@theme` tokens and `@source` directives are available to diagnostics.
+
 ### Tailwind CSS v3 (Legacy)
 
 Create a JavaScript config file (`tailwind.config.js`):
@@ -165,6 +183,7 @@ Files are written atomically with multiple iterations to ensure all fixes are ap
 - Recommended Variant Order - Suggests preferred ordering of variants
 - Blocklisted Classes - Detects usage of blocklisted classes
 - Autofix - Automatically fix issues with `--fix` flag
+- Quoted class string extraction - Lints class-like strings in common helper patterns, not only direct `class` and `className` attributes
 
 **v4-Specific:**
 

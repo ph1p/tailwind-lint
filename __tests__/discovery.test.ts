@@ -2,10 +2,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { TAILWIND_V4_IMPORT_REGEX } from "../src/constants";
+import {
+	SYNTHETIC_VITE_CSS_CONFIG_NAME,
+	TAILWIND_V4_IMPORT_REGEX,
+	TAILWIND_VITE_PLUGIN_REGEX,
+} from "../src/constants";
 import {
 	extractImportSourceDirectives,
 	extractSourcePatterns,
+	lint,
 } from "../src/linter";
 import { findTailwindConfigPath } from "../src/utils/config";
 import { readGitignorePatterns } from "../src/utils/fs";
@@ -178,6 +183,32 @@ describe("TAILWIND_V4_IMPORT_REGEX", () => {
 	});
 });
 
+describe("TAILWIND_VITE_PLUGIN_REGEX", () => {
+	it("should match @tailwindcss/vite imports", () => {
+		expect(
+			TAILWIND_VITE_PLUGIN_REGEX.test(
+				'import tailwindcss from "@tailwindcss/vite";',
+			),
+		).toBe(true);
+		expect(
+			TAILWIND_VITE_PLUGIN_REGEX.test(
+				'const tailwindcss = require("@tailwindcss/vite");',
+			),
+		).toBe(true);
+		expect(
+			TAILWIND_VITE_PLUGIN_REGEX.test('await import("@tailwindcss/vite")'),
+		).toBe(true);
+	});
+
+	it("should not match unrelated Vite plugins", () => {
+		expect(
+			TAILWIND_VITE_PLUGIN_REGEX.test(
+				'import react from "@vitejs/plugin-react";',
+			),
+		).toBe(false);
+	});
+});
+
 describe("readGitignorePatterns", () => {
 	let tmpDir: string;
 
@@ -282,5 +313,127 @@ describe("findTailwindConfigPath", () => {
 
 		const discovered = await findTailwindConfigPath(tmpDir);
 		expect(discovered).toBe(path.join(nestedDir, "theme.css"));
+	});
+
+	it("should discover v4 projects configured through the Tailwind Vite plugin", async () => {
+		const nestedDir = path.join(tmpDir, "packages", "ladle");
+		fs.mkdirSync(nestedDir, { recursive: true });
+		fs.writeFileSync(
+			path.join(nestedDir, "vite.config.ts"),
+			`
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [tailwindcss()],
+});
+`,
+		);
+
+		const discovered = await findTailwindConfigPath(tmpDir);
+		expect(discovered).toBe(
+			path.join(nestedDir, SYNTHETIC_VITE_CSS_CONFIG_NAME),
+		);
+	});
+});
+
+describe("lint with Vite config discovery", () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tailwind-vite-test-"));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("should initialize Tailwind v4 from @tailwindcss/vite and lint files", async () => {
+		fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+		fs.writeFileSync(
+			path.join(tmpDir, "vite.config.ts"),
+			`
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [tailwindcss()],
+});
+`,
+		);
+		fs.writeFileSync(
+			path.join(tmpDir, "src", "example.html"),
+			'<div class="block flex p-[16px]"></div>',
+		);
+		fs.symlinkSync(
+			path.resolve(__dirname, "fixtures", "v4", "node_modules"),
+			path.join(tmpDir, "node_modules"),
+			"dir",
+		);
+
+		const result = await lint({
+			cwd: tmpDir,
+			patterns: [],
+			autoDiscover: true,
+		});
+
+		expect(result.totalFilesProcessed).toBe(2);
+		expect(result.files).toHaveLength(1);
+		expect(result.files[0].diagnostics.map((d) => d.code)).toEqual(
+			expect.arrayContaining(["cssConflict", "suggestCanonicalClasses"]),
+		);
+	});
+
+	it("should prefer Ladle CSS config and lint class strings in helpers", async () => {
+		fs.mkdirSync(path.join(tmpDir, ".ladle"), { recursive: true });
+		fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+		fs.writeFileSync(
+			path.join(tmpDir, "vite.config.ts"),
+			`
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+
+export default defineConfig({
+	plugins: [tailwindcss()],
+});
+`,
+		);
+		fs.writeFileSync(
+			path.join(tmpDir, ".ladle", "styles.css"),
+			`
+@import "tailwindcss" source("../src");
+
+@theme inline {
+	--color-ladle-text-secondary: var(--ladle-color-secondary);
+}
+`,
+		);
+		fs.writeFileSync(
+			path.join(tmpDir, "src", "helper.tsx"),
+			`
+const badge = (className: string) => <span className={className} />;
+
+export const Demo = () =>
+	badge("font-semibold text-[var(--ladle-color-secondary)]");
+`,
+		);
+		fs.symlinkSync(
+			path.resolve(__dirname, "fixtures", "v4", "node_modules"),
+			path.join(tmpDir, "node_modules"),
+			"dir",
+		);
+
+		const result = await lint({
+			cwd: tmpDir,
+			patterns: [],
+			autoDiscover: true,
+		});
+
+		const messages = result.files.flatMap((file) =>
+			file.diagnostics.map((diagnostic) => diagnostic.message),
+		);
+		expect(messages).toContain(
+			"The class `text-[var(--ladle-color-secondary)]` can be written as `text-(--ladle-color-secondary)`",
+		);
 	});
 });
