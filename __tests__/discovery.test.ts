@@ -437,3 +437,51 @@ export const Demo = () =>
 		);
 	});
 });
+
+describe("config-driven CLI behavior", () => {
+	let tmpDir: string;
+
+	beforeEach(() => {
+		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tailwind-config-mode-"));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tmpDir, { recursive: true, force: true });
+	});
+
+	it("should use config-driven discovery when a css config path is provided without files", async () => {
+		fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+		fs.writeFileSync(
+			path.join(tmpDir, "package.json"),
+			fs.readFileSync(
+				path.resolve(__dirname, "fixtures", "v4", "package.json"),
+				"utf-8",
+			),
+			"utf-8",
+		);
+		fs.symlinkSync(
+			path.resolve(__dirname, "fixtures", "v4", "node_modules"),
+			path.join(tmpDir, "node_modules"),
+			"dir",
+		);
+		fs.writeFileSync(
+			path.join(tmpDir, "src", "app.css"),
+			'@import "tailwindcss" source("./");\n',
+		);
+		fs.writeFileSync(
+			path.join(tmpDir, "src", "example.html"),
+			'<div class="p-[16px]"></div>\n',
+		);
+
+		const result = await lint({
+			cwd: path.join(tmpDir, "src"),
+			patterns: [],
+			configPath: path.join(tmpDir, "src", "app.css"),
+			autoDiscover: true,
+		});
+
+		expect(result.totalFilesProcessed).toBe(2);
+		expect(result.files).toHaveLength(1);
+		expect(result.files[0].path).toBe("example.html");
+	});
+});

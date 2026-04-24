@@ -2,6 +2,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { EditorState, Settings } from "@tailwindcss/language-service";
 import { DEFAULT_ROOT_FONT_SIZE, DEFAULT_TAB_SIZE } from "../constants";
+import {
+	loadWorkspaceTailwindSettings,
+	mergeEditorSettings,
+} from "../utils/settings";
 
 function isDirectory(filePath: string) {
 	try {
@@ -12,7 +16,7 @@ function isDirectory(filePath: string) {
 }
 
 export function createEditorState(cwd: string) {
-	const settings: Settings = {
+	const defaultSettings: Settings = {
 		editor: {
 			tabSize: DEFAULT_TAB_SIZE,
 		},
@@ -68,6 +72,10 @@ export function createEditorState(cwd: string) {
 			},
 		},
 	};
+	const settings = mergeEditorSettings(
+		defaultSettings,
+		loadWorkspaceTailwindSettings(cwd),
+	);
 
 	return {
 		connection: null as unknown as EditorState["connection"],

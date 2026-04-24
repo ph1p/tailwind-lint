@@ -33,6 +33,7 @@ interface JsonSummary {
 interface JsonLintOutput {
 	ok: boolean;
 	summary: JsonSummary;
+	error?: string;
 	config: {
 		cwd: string;
 		configPath: string | null;
@@ -131,5 +132,41 @@ export function createJsonOutput({
 			patterns,
 		},
 		files: mappedFiles,
+	};
+}
+
+export function createJsonErrorOutput({
+	error,
+	cwd,
+	configPath,
+	autoDiscover,
+	fix,
+	patterns,
+}: {
+	error: string;
+	cwd: string;
+	configPath?: string;
+	autoDiscover: boolean;
+	fix: boolean;
+	patterns: string[];
+}): JsonLintOutput {
+	return {
+		ok: false,
+		error,
+		summary: {
+			errors: 0,
+			warnings: 0,
+			fixed: 0,
+			filesWithIssues: 0,
+			totalFilesProcessed: 0,
+		},
+		config: {
+			cwd,
+			configPath: configPath || null,
+			autoDiscover,
+			fix,
+			patterns,
+		},
+		files: [],
 	};
 }

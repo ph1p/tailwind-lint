@@ -12,7 +12,11 @@ import {
 	TERMINAL_WIDTH,
 } from "./constants";
 import { lint } from "./linter";
-import { countBySeverity, createJsonOutput } from "./output";
+import {
+	countBySeverity,
+	createJsonErrorOutput,
+	createJsonOutput,
+} from "./output";
 import type { LintFileResult } from "./types";
 
 const MAX_FILENAME_DISPLAY_LENGTH = 50;
@@ -33,17 +37,19 @@ function resolveOptions(files: string[], options: CliOptions) {
 	let cwd = process.cwd();
 	let configPath = options.config;
 	let patterns = files;
+	let autoDiscover = hasAutoFlag;
 
-	if (hasConfigFlag && options.config && !hasFiles) {
-		const absoluteConfigPath = path.isAbsolute(options.config)
+	if (hasConfigFlag && options.config) {
+		configPath = path.isAbsolute(options.config)
 			? options.config
 			: path.resolve(process.cwd(), options.config);
-		cwd = path.dirname(absoluteConfigPath);
-		configPath = path.basename(absoluteConfigPath);
-		patterns = [DEFAULT_FILE_PATTERN];
 	}
 
-	const autoDiscover = hasAutoFlag;
+	if (hasConfigFlag && options.config && !hasFiles) {
+		cwd = path.dirname(configPath);
+		patterns = [];
+		autoDiscover = true;
+	}
 
 	return {
 		cwd,
@@ -203,7 +209,7 @@ program
 	)
 	.option(
 		"-a, --auto",
-		"Auto-discover files from Tailwind config content patterns",
+		"Auto-discover files from Tailwind config or CSS @source patterns",
 	)
 	.option("--fix", "Automatically fix problems that can be fixed")
 	.option("-v, --verbose", "Enable verbose logging for debugging")
@@ -215,14 +221,17 @@ ${ansis.bold.cyan("Examples:")}
   ${ansis.dim("$")} tailwind-lint
   ${ansis.dim("$")} tailwind-lint ${ansis.green('"src/**/*.{js,jsx,ts,tsx}"')}
   ${ansis.dim("$")} tailwind-lint ${ansis.yellow("--config")} ${ansis.green("./tailwind.config.js")}
+  ${ansis.dim("$")} tailwind-lint ${ansis.yellow("--config")} ${ansis.green("./src/app.css")}
   ${ansis.dim("$")} tailwind-lint ${ansis.green('"src/**/*.tsx"')} ${ansis.yellow("--fix")}
   ${ansis.dim("$")} tailwind-lint ${ansis.green('"**/*.vue"')}
 
 ${ansis.bold.cyan("Notes:")}
   ${ansis.dim("•")} Running without arguments auto-discovers config and files
+  ${ansis.dim("•")} Using ${ansis.yellow("--config")} without files scans based on that config
   ${ansis.dim("•")} For v3: uses content patterns from tailwind.config.js
-  ${ansis.dim("•")} For v4: uses @source patterns from CSS config, or default pattern
-  ${ansis.dim("•")} Default pattern: ${ansis.dim("./**/*.{js,jsx,ts,tsx,html}")}
+  ${ansis.dim("•")} For v4: uses @source patterns from CSS config, Vite detection, or default pattern
+  ${ansis.dim("•")} Default pattern: ${ansis.dim(DEFAULT_FILE_PATTERN)}
+  ${ansis.dim("•")} Reads Tailwind workspace settings from ${ansis.dim(".zed/settings.json")} and ${ansis.dim(".vscode/settings.json")}
   ${ansis.dim("•")} Use ${ansis.yellow("--fix")} to automatically resolve fixable issues
 `,
 	)
@@ -334,10 +343,12 @@ ${ansis.bold.cyan("Notes:")}
 				error instanceof Error ? error.message : String(error);
 			if (isJsonOutput) {
 				console.log(
-					JSON.stringify({
-						ok: false,
-						error: errorMessage,
-					}),
+					JSON.stringify(
+						createJsonErrorOutput({
+							error: errorMessage,
+							...resolved,
+						}),
+					),
 				);
 			} else {
 				console.error(ansis.red("✖ Error:"), errorMessage);

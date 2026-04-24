@@ -65,7 +65,7 @@ tailwind-lint --verbose
 ### Options
 
 - `-c, --config <path>` - Path to Tailwind config file (default: auto-discover)
-- `-a, --auto` - Auto-discover files from config content patterns (legacy, enabled by default)
+- `-a, --auto` - Auto-discover files from the resolved Tailwind config or CSS `@source` directives
 - `--fix` - Automatically fix problems that can be fixed
 - `--format <text|json>` - Output format (`text` default, `json` for machine-readable output)
 - `-v, --verbose` - Enable verbose logging for debugging
@@ -80,6 +80,9 @@ tailwind-lint "src/**/*.{js,jsx,ts,tsx}"
 
 # Specify a custom config location
 tailwind-lint --config ./config/tailwind.config.js
+
+# Scan files based on an explicit config
+tailwind-lint --config ./src/app.css
 
 # Lint and fix specific file types
 tailwind-lint "**/*.vue" --fix
@@ -108,6 +111,8 @@ The JSON payload includes:
 - `summary` - counts for `errors`, `warnings`, `fixed`, `filesWithIssues`, `totalFilesProcessed`
 - `config` - resolved runtime values (`cwd`, `configPath`, `autoDiscover`, `fix`, `patterns`)
 - `files[]` - per-file diagnostics with 1-based `line`/`column` ranges
+
+On JSON errors, the CLI keeps the same top-level shape and adds `error` so agent integrations do not need a separate parser for failure cases.
 
 Typical agent flow:
 
@@ -146,6 +151,52 @@ export default defineConfig({
 ```
 
 If a real CSS config is also present, the CLI uses that file so custom `@theme` tokens and `@source` directives are available to diagnostics.
+
+### Workspace Settings
+
+The CLI also reads Tailwind workspace settings from common editor config files so extraction behavior can match your editor more closely.
+
+Supported locations:
+
+- `.zed/settings.json`
+- `.vscode/settings.json`
+
+Supported settings:
+
+- `classFunctions`
+- `experimental.classRegex`
+- `classAttributes`
+- `includeLanguages`
+- `files.exclude`
+- `lint`
+
+Zed format:
+
+```json
+{
+	"lsp": {
+		"tailwindcss-language-server": {
+			"settings": {
+				"classFunctions": ["cva", "cx"],
+				"experimental": {
+					"classRegex": ["tw=\"([^\"]*)\""]
+				}
+			}
+		}
+	}
+}
+```
+
+VS Code format:
+
+```json
+{
+	"tailwindCSS.classFunctions": ["cva", "cx"],
+	"tailwindCSS.experimental": {
+		"classRegex": ["tw=\"([^\"]*)\""]
+	}
+}
+```
 
 ### Tailwind CSS v3 (Legacy)
 

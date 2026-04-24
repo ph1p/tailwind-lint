@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createJsonOutput, toJsonDiagnostic } from "../src/output";
+import {
+	createJsonErrorOutput,
+	createJsonOutput,
+	toJsonDiagnostic,
+} from "../src/output";
 import type { Diagnostic } from "vscode-languageserver";
 
 describe("toJsonDiagnostic", () => {
@@ -83,5 +87,38 @@ describe("createJsonOutput", () => {
 		});
 		expect(output.files[0].path).toBe("src/example.html");
 		expect(output.files[0].diagnostics).toHaveLength(2);
+	});
+});
+
+describe("createJsonErrorOutput", () => {
+	it("should keep the machine-readable shape on errors", () => {
+		const output = createJsonErrorOutput({
+			error: "Config not found",
+			cwd: "/tmp/project",
+			configPath: "/tmp/project/src/app.css",
+			autoDiscover: true,
+			fix: false,
+			patterns: [],
+		});
+
+		expect(output).toEqual({
+			ok: false,
+			error: "Config not found",
+			summary: {
+				errors: 0,
+				warnings: 0,
+				fixed: 0,
+				filesWithIssues: 0,
+				totalFilesProcessed: 0,
+			},
+			config: {
+				cwd: "/tmp/project",
+				configPath: "/tmp/project/src/app.css",
+				autoDiscover: true,
+				fix: false,
+				patterns: [],
+			},
+			files: [],
+		});
 	});
 });
