@@ -50,7 +50,7 @@ tailwind-lint --verbose
 **Tailwind CSS v4:**
 
 - Finds CSS config files in common locations: `app.css`, `index.css`, `tailwind.css`, `global.css`, etc.
-- Searches in project root and subdirectories: `./`, `./src/`, `./src/styles/`, `./app/`, `./.ladle/`, etc.
+- Searches in project root and subdirectories: `./`, `./src/`, `./src/styles/`, `./app/`, etc.
 - Detects `vite.config.*` files that use `@tailwindcss/vite`
 - Prefers real CSS configs when present, so custom `@theme` tokens and `@source` directives are available to diagnostics
 - Uses file patterns from `@source` directives if present
@@ -145,7 +145,7 @@ export default defineConfig({
 });
 ```
 
-If a real CSS config is also present, for example `.ladle/styles.css`, the CLI uses that file so custom `@theme` tokens and `@source` directives are available to diagnostics.
+If a real CSS config is also present, the CLI uses that file so custom `@theme` tokens and `@source` directives are available to diagnostics.
 
 ### Tailwind CSS v3 (Legacy)
 
