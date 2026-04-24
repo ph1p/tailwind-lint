@@ -316,7 +316,7 @@ describe("findTailwindConfigPath", () => {
 	});
 
 	it("should discover v4 projects configured through the Tailwind Vite plugin", async () => {
-		const nestedDir = path.join(tmpDir, "packages", "ladle");
+		const nestedDir = path.join(tmpDir, "packages", "docs");
 		fs.mkdirSync(nestedDir, { recursive: true });
 		fs.writeFileSync(
 			path.join(nestedDir, "vite.config.ts"),
@@ -384,8 +384,8 @@ export default defineConfig({
 		);
 	});
 
-	it("should prefer Ladle CSS config and lint class strings in helpers", async () => {
-		fs.mkdirSync(path.join(tmpDir, ".ladle"), { recursive: true });
+	it("should prefer real css config files and lint class strings in helpers", async () => {
+		fs.mkdirSync(path.join(tmpDir, "styles"), { recursive: true });
 		fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
 		fs.writeFileSync(
 			path.join(tmpDir, "vite.config.ts"),
@@ -399,12 +399,12 @@ export default defineConfig({
 `,
 		);
 		fs.writeFileSync(
-			path.join(tmpDir, ".ladle", "styles.css"),
+			path.join(tmpDir, "styles", "theme.css"),
 			`
 @import "tailwindcss" source("../src");
 
 @theme inline {
-	--color-ladle-text-secondary: var(--ladle-color-secondary);
+	--color-app-text-secondary: var(--app-text-secondary);
 }
 `,
 		);
@@ -414,7 +414,7 @@ export default defineConfig({
 const badge = (className: string) => <span className={className} />;
 
 export const Demo = () =>
-	badge("font-semibold text-[var(--ladle-color-secondary)]");
+	badge("font-semibold text-[var(--app-text-secondary)]");
 `,
 		);
 		fs.symlinkSync(
@@ -433,7 +433,7 @@ export const Demo = () =>
 			file.diagnostics.map((diagnostic) => diagnostic.message),
 		);
 		expect(messages).toContain(
-			"The class `text-[var(--ladle-color-secondary)]` can be written as `text-(--ladle-color-secondary)`",
+			"The class `text-[var(--app-text-secondary)]` can be written as `text-(--app-text-secondary)`",
 		);
 	});
 });

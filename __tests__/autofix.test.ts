@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lint } from "../src/linter";
@@ -129,6 +130,108 @@ describe("Autofix functionality", () => {
 			if (fs.existsSync(cleanFilePath)) {
 				fs.unlinkSync(cleanFilePath);
 			}
+		}
+	});
+
+	it("should auto-discover and fix issues inside the v4 css config file", async () => {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tailwind-css-fix-"));
+		const appCssPath = path.join(tmpDir, "src", "app.css");
+
+		try {
+			fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+			fs.writeFileSync(
+				path.join(tmpDir, "package.json"),
+				fs.readFileSync(path.join(fixtureDir, "package.json"), "utf-8"),
+				"utf-8",
+			);
+			fs.symlinkSync(
+				path.join(fixtureDir, "node_modules"),
+				path.join(tmpDir, "node_modules"),
+				"dir",
+			);
+			fs.writeFileSync(
+				appCssPath,
+				`@import "tailwindcss";
+
+.demo {
+	@apply mx-auto max-w-[780px] bg-[var(--app-bg-primary)] px-10 pt-12 pb-20 text-[var(--app-text-primary)];
+}
+`,
+				"utf-8",
+			);
+
+			const results = await lint({
+				cwd: tmpDir,
+				patterns: [],
+				autoDiscover: true,
+				fix: true,
+			});
+
+			expect(results.totalFilesProcessed).toBe(1);
+			expect(results.files).toHaveLength(1);
+			expect(results.files[0].fixed).toBe(true);
+
+			const fixedContent = fs.readFileSync(appCssPath, "utf-8");
+			expect(fixedContent).toContain("@apply mx-auto max-w-195");
+			expect(fixedContent).toContain("bg-(--app-bg-primary)");
+			expect(fixedContent).toContain("text-(--app-text-primary)");
+			expect(fixedContent).not.toContain("max-w-[780px]");
+			expect(fixedContent).not.toContain("bg-[var(--app-bg-primary)]");
+			expect(fixedContent).not.toContain("text-[var(--app-text-primary)]");
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		}
+	});
+
+	it("should include the css config file when an explicit config path is used", async () => {
+		const tmpDir = fs.mkdtempSync(
+			path.join(os.tmpdir(), "tailwind-css-config-"),
+		);
+		const appCssPath = path.join(tmpDir, "src", "app.css");
+		const htmlPath = path.join(tmpDir, "src", "index.html");
+
+		try {
+			fs.mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+			fs.writeFileSync(
+				path.join(tmpDir, "package.json"),
+				fs.readFileSync(path.join(fixtureDir, "package.json"), "utf-8"),
+				"utf-8",
+			);
+			fs.symlinkSync(
+				path.join(fixtureDir, "node_modules"),
+				path.join(tmpDir, "node_modules"),
+				"dir",
+			);
+			fs.writeFileSync(
+				appCssPath,
+				`@import "tailwindcss";
+
+.demo {
+	@apply max-w-[780px] text-[var(--app-text-primary)];
+}
+`,
+				"utf-8",
+			);
+			fs.writeFileSync(htmlPath, '<div class="p-[16px]"></div>\n', "utf-8");
+
+			const results = await lint({
+				cwd: tmpDir,
+				patterns: ["src/**/*.html"],
+				configPath: appCssPath,
+				autoDiscover: false,
+				fix: true,
+			});
+
+			expect(results.totalFilesProcessed).toBe(2);
+			expect(results.files).toHaveLength(2);
+
+			const fixedCss = fs.readFileSync(appCssPath, "utf-8");
+			const fixedHtml = fs.readFileSync(htmlPath, "utf-8");
+
+			expect(fixedCss).toContain("@apply max-w-195 text-(--app-text-primary)");
+			expect(fixedHtml).toContain('<div class="p-4"></div>');
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
 		}
 	});
 });

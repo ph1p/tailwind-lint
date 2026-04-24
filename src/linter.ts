@@ -137,6 +137,16 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 	const cssContent = fileExists(configFilePath)
 		? readFileSync(configFilePath)
 		: SYNTHETIC_VITE_CSS_CONFIG_CONTENT;
+	const includeConfigFile = (files: string[]) => {
+		if (!fileExists(configFilePath)) {
+			return files;
+		}
+
+		const relativeConfigPath = path.relative(cwd, configFilePath);
+		return [...new Set([relativeConfigPath, ...files])].sort((a, b) =>
+			a.localeCompare(b),
+		);
+	};
 	const { include, exclude } = extractSourcePatterns(cssContent);
 	const importSource = extractImportSourceDirectives(cssContent);
 
@@ -151,7 +161,9 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 
 	if (include.length > 0) {
 		const resolvedPatterns = include.map(resolveFromConfig);
-		return expandPatterns(cwd, resolvedPatterns, extraIgnore);
+		return includeConfigFile(
+			await expandPatterns(cwd, resolvedPatterns, extraIgnore),
+		);
 	}
 
 	if (importSource.roots.length > 0) {
@@ -160,14 +172,18 @@ async function discoverFilesFromConfig(cwd: string, configPath?: string) {
 				path.join(root, "**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}"),
 			),
 		);
-		return expandPatterns(cwd, sourcePatterns, extraIgnore);
+		return includeConfigFile(
+			await expandPatterns(cwd, sourcePatterns, extraIgnore),
+		);
 	}
 
 	if (importSource.disableAutoSource) {
-		return [];
+		return includeConfigFile([]);
 	}
 
-	return expandPatterns(cwd, [DEFAULT_FILE_PATTERN], extraIgnore);
+	return includeConfigFile(
+		await expandPatterns(cwd, [DEFAULT_FILE_PATTERN], extraIgnore),
+	);
 }
 
 function extractContentPatterns(config: TailwindConfig) {
@@ -332,7 +348,23 @@ export async function lint({
 	onProgress,
 }: LintOptions): Promise<LintResult> {
 	const state = await initializeState(cwd, configPath, verbose);
-	const files = await discoverFiles(cwd, patterns, configPath, autoDiscover);
+	const discoveredFiles = await discoverFiles(
+		cwd,
+		patterns,
+		configPath,
+		autoDiscover,
+	);
+	const files =
+		state.configPath &&
+		isCssConfigFile(state.configPath) &&
+		fileExists(state.configPath)
+			? [
+					...new Set([
+						path.relative(cwd, state.configPath),
+						...discoveredFiles,
+					]),
+				].sort((a, b) => a.localeCompare(b))
+			: discoveredFiles;
 
 	if (verbose) {
 		console.log(

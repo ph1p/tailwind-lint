@@ -51,7 +51,6 @@ export const V4_CSS_FOLDERS = [
 	"./styles/",
 	"./assets/css/",
 	"./resources/css/",
-	"./.ladle/",
 ];
 
 export const VITE_CONFIG_PATHS = [
