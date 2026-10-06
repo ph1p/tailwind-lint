@@ -61,22 +61,22 @@
 		"@tailwindcss/language-service": "^0.16.0",
 		"ansis": "^4.4.0",
 		"commander": "^15.0.0",
-		"postcss": "^8.5.28",
+		"postcss": "^8.5.29",
 		"tinyglobby": "^0.2.17",
 		"vscode-languageserver-textdocument": "^1.0.15"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.4",
-		"oxfmt": "^0.71.0",
-		"oxlint": "^1.86.0",
+		"oxfmt": "^0.72.0",
+		"oxlint": "^1.87.0",
 		"tsdown": "^0.23.0",
 		"typescript": "^7.0.2",
 		"vitest": "^5.0.3",
-		"vscode-languageserver": "8.1.0"
+		"vscode-languageserver": "10.1.2"
 	},
 	"engines": {
 		"node": ">=22.0.0",
 		"pnpm": ">=10.0.0"
 	},
-	"packageManager": "pnpm@12.8.1"
+	"packageManager": "pnpm@12.9.1"
 }
