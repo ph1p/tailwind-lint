@@ -32,5 +32,14 @@
 		<!-- No conflicts - these should not be flagged -->
 		<div class="flex items-center justify-center">No conflicts</div>
 		<div class="text-blue-500 bg-white p-4">No conflicts</div>
+
+		<!-- Variant / nested-selector pairs must not be treated as conflicts -->
+		<div class="text-black disabled:text-red-500">
+			No conflict: disabled variant
+		</div>
+		<div class="[&_img]:object-cover [&_video]:object-cover">
+			No conflict: different nested selectors
+		</div>
+		<div class="bg-white disabled:bg-white">Redundant disabled background</div>
 	</body>
 </html>

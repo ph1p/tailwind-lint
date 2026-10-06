@@ -83,6 +83,39 @@ describe("CSS Conflict Detection - v4", () => {
 		});
 	});
 
+	it("should not flag variant or nested-selector pairs as conflicts", async () => {
+		const result = await lint({
+			cwd: testV4Dir,
+			patterns: ["src/css-conflicts.html"],
+			autoDiscover: false,
+		});
+
+		const file = result.files[0];
+		const messages = file.diagnostics
+			.filter((d) => d.code === "cssConflict")
+			.map((d) => d.message);
+
+		expect(
+			messages.some(
+				(m) => m.includes("text-black") && m.includes("disabled:text-red-500"),
+			),
+		).toBe(false);
+
+		expect(
+			messages.some(
+				(m) =>
+					m.includes("[&_img]:object-cover") &&
+					m.includes("[&_video]:object-cover"),
+			),
+		).toBe(false);
+
+		expect(
+			messages.some(
+				(m) => m.includes("bg-white") && m.includes("disabled:bg-white"),
+			),
+		).toBe(false);
+	});
+
 	it("should report correct line and column numbers for conflicts", async () => {
 		const result = await lint({
 			cwd: testV4Dir,
