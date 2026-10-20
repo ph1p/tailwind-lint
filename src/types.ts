@@ -36,6 +36,8 @@ export interface LintOptions {
 	autoDiscover: boolean;
 	fix?: boolean;
 	verbose?: boolean;
+	/** Number of worker threads, or "auto" for the available CPU parallelism. Defaults to 1. */
+	concurrency?: number | "auto";
 	onProgress?: (current: number, total: number, file: string) => void;
 }
 

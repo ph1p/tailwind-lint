@@ -27,6 +27,7 @@ interface CliOptions {
 	auto?: boolean;
 	fix?: boolean;
 	verbose?: boolean;
+	concurrency?: string;
 	format?: "text" | "json";
 }
 
@@ -53,6 +54,12 @@ function resolveOptions(files: string[], options: CliOptions) {
 		autoDiscover,
 		fix: options.fix || false,
 		verbose: options.verbose || false,
+		concurrency:
+			options.concurrency === "auto"
+				? ("auto" as const)
+				: options.concurrency === undefined
+					? 1
+					: Number(options.concurrency),
 	};
 }
 
@@ -207,6 +214,10 @@ program
 		"Auto-discover files from Tailwind config or CSS @source patterns",
 	)
 	.option("--fix", "Automatically fix problems that can be fixed")
+	.option(
+		"--concurrency <number|auto>",
+		"Worker threads for linting and fixing (default: 1)",
+	)
 	.option("-v, --verbose", "Enable verbose logging for debugging")
 	.option("--format <format>", "Output format: text or json", "text")
 	.addHelpText(
@@ -262,6 +273,7 @@ ${ansis.bold.cyan("Notes:")}
 
 			const results = await lint({
 				...resolved,
+				verbose: resolved.verbose && !isJsonOutput,
 				onProgress: (current, total, file) => {
 					if (isJsonOutput) return;
 
