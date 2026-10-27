@@ -105,9 +105,6 @@ export const SEVERITY = {
 	WARNING: 2,
 } as const;
 
-export const TERMINAL_WIDTH = 80;
-export const TERMINAL_PADDING = 10;
-
 export const MAX_FIX_ITERATIONS = 100;
 export const QUICKFIX_ACTION_KIND = "quickfix";
 

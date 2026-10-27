@@ -75,6 +75,7 @@ describe("createJsonOutput", () => {
 			errors: 1,
 			warnings: 1,
 			fixed: 2,
+			fixable: 0,
 			filesWithIssues: 1,
 			totalFilesProcessed: 3,
 		});
@@ -83,6 +84,7 @@ describe("createJsonOutput", () => {
 			configPath: "src/app.css",
 			autoDiscover: true,
 			fix: true,
+			dryRun: false,
 			patterns: [],
 		});
 		expect(output.files[0].path).toBe("src/example.html");
@@ -108,6 +110,7 @@ describe("createJsonErrorOutput", () => {
 				errors: 0,
 				warnings: 0,
 				fixed: 0,
+				fixable: 0,
 				filesWithIssues: 0,
 				totalFilesProcessed: 0,
 			},
@@ -116,6 +119,7 @@ describe("createJsonErrorOutput", () => {
 				configPath: "/tmp/project/src/app.css",
 				autoDiscover: true,
 				fix: false,
+				dryRun: false,
 				patterns: [],
 			},
 			files: [],

@@ -73,6 +73,28 @@ describe("Autofix functionality", () => {
 		expect(fixedContent).not.toContain("top-[60px]");
 	});
 
+	it("should compute fixes without writing them in dry-run mode", async () => {
+		const originalContent = fs.readFileSync(testFilePath, "utf-8");
+
+		const results = await lint({
+			cwd: fixtureDir,
+			patterns: ["src/test-autofix-temp.html"],
+			configPath: path.join(fixtureDir, "src", "app.css"),
+			autoDiscover: false,
+			dryRun: true,
+		});
+
+		expect(results.files).toHaveLength(1);
+		expect(results.files[0].fixed).toBe(true);
+		expect(results.files[0].fixedCount).toBe(3);
+		expect(results.files[0].diagnostics).toHaveLength(0);
+		expect(results.files[0].originalContent).toBe(originalContent);
+		expect(results.files[0].fixedContent).toContain('class="p-4 w-50 top-15"');
+
+		// The file on disk must stay untouched
+		expect(fs.readFileSync(testFilePath, "utf-8")).toBe(originalContent);
+	});
+
 	it("should preserve file structure when fixing", async () => {
 		const originalContent = fs.readFileSync(testFilePath, "utf-8");
 

@@ -4,16 +4,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import ansis from "ansis";
 import { Command } from "commander";
-import {
-	DEFAULT_FILE_PATTERN,
-	DEFAULT_VERSION,
-	SEVERITY,
-	TERMINAL_PADDING,
-	TERMINAL_WIDTH,
-} from "./constants";
+import { DEFAULT_FILE_PATTERN, DEFAULT_VERSION, SEVERITY } from "./constants";
+import { diffLines } from "./diff";
 import { lint } from "./linter";
 import {
 	countBySeverity,
+	countFixable,
 	createJsonErrorOutput,
 	createJsonOutput,
 } from "./output";
@@ -21,11 +17,14 @@ import type { LintFileResult } from "./types";
 import { findProjectRoot, isCssConfigFile } from "./utils/config";
 
 const MAX_FILENAME_DISPLAY_LENGTH = 50;
+const MAX_DIFF_LINES_PER_FILE = 10;
+const CLEAR_LINE = "\r\x1b[2K";
 
 interface CliOptions {
 	config?: string;
 	auto?: boolean;
 	fix?: boolean;
+	dryRun?: boolean;
 	verbose?: boolean;
 	format?: "text" | "json";
 }
@@ -46,12 +45,15 @@ function resolveOptions(files: string[], options: CliOptions) {
 		autoDiscover = true;
 	}
 
+	const dryRun = options.dryRun || false;
+
 	return {
 		cwd,
 		configPath,
 		patterns: autoDiscover ? [] : patterns,
 		autoDiscover,
-		fix: options.fix || false,
+		fix: options.fix || dryRun,
+		dryRun,
 		verbose: options.verbose || false,
 	};
 }
@@ -62,84 +64,143 @@ function truncateFilename(filename: string) {
 		: filename;
 }
 
-async function displayResults(files: LintFileResult[], fixMode: boolean) {
-	let totalErrors = 0;
-	let totalWarnings = 0;
-	let totalFixed = 0;
+function plural(count: number, word: string) {
+	return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function formatDuration(ms: number) {
+	return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(2)}s`;
+}
+
+function formatDiff(file: LintFileResult) {
+	if (file.originalContent === undefined || file.fixedContent === undefined) {
+		return [];
+	}
+
+	const changes = diffLines(file.originalContent, file.fixedContent);
+	const shown = changes.slice(0, MAX_DIFF_LINES_PER_FILE);
+	const width = String(shown.at(-1)?.line ?? 0).length;
+	const lines: string[] = [];
+
+	for (const change of shown) {
+		const lineNo = ansis.dim(String(change.line).padStart(width));
+		const blank = " ".repeat(width);
+		if (change.removed !== undefined) {
+			lines.push(`    ${lineNo} ${ansis.red(`- ${change.removed.trim()}`)}`);
+		}
+		if (change.added !== undefined) {
+			const prefix = change.removed !== undefined ? blank : lineNo;
+			lines.push(`    ${prefix} ${ansis.green(`+ ${change.added.trim()}`)}`);
+		}
+	}
+
+	const hidden = changes.length - shown.length;
+	if (hidden > 0) {
+		lines.push(ansis.dim(`    … ${plural(hidden, "more changed line")}`));
+	}
+	return lines;
+}
+
+function formatFile(file: LintFileResult, dryRun: boolean) {
+	const lines = [ansis.underline.bold(file.path)];
+
+	if (file.fixed) {
+		const issues = plural(file.fixedCount || 0, "issue");
+		lines.push(
+			dryRun
+				? ansis.cyan(`  ~ Would fix ${issues}`)
+				: ansis.green(`  ✔ Fixed ${issues}`),
+		);
+		if (dryRun) lines.push(...formatDiff(file));
+	}
+
+	const positions = file.diagnostics.map(
+		(d) => `${d.range.start.line + 1}:${d.range.start.character + 1}`,
+	);
+	const positionWidth = Math.max(0, ...positions.map((p) => p.length));
+
+	for (const [index, diagnostic] of file.diagnostics.entries()) {
+		const isError = diagnostic.severity === SEVERITY.ERROR;
+		const severity = isError ? ansis.red("error  ") : ansis.yellow("warning");
+		const code = diagnostic.code
+			? `  ${ansis.dim(String(diagnostic.code))}`
+			: "";
+		lines.push(
+			`  ${ansis.dim(positions[index].padEnd(positionWidth))}  ${severity}  ${diagnostic.message}${code}`,
+		);
+	}
+
+	return lines;
+}
+
+function formatSummary(
+	files: LintFileResult[],
+	totalFilesProcessed: number,
+	durationMs: number,
+	fixMode: boolean,
+	dryRun: boolean,
+) {
+	let errors = 0;
+	let warnings = 0;
+	let fixed = 0;
+	let fixable = 0;
 	let filesWithIssues = 0;
-	let isFirstFile = true;
+	let filesFixed = 0;
 
 	for (const file of files) {
-		if (file.diagnostics.length > 0 || (fixMode && file.fixed)) {
-			if (isFirstFile) {
-				console.log();
-				isFirstFile = false;
-			} else {
-				console.log();
-			}
-			console.log(ansis.underline.bold(file.path));
-
-			if (fixMode && file.fixed) {
-				const issueText = `${file.fixedCount || 0} issue${file.fixedCount !== 1 ? "s" : ""}`;
-				console.log(ansis.green(`  ✔ Fixed ${issueText}`));
-				totalFixed += file.fixedCount || 0;
-			}
-
-			const { errors, warnings } = countBySeverity(file.diagnostics);
-			totalErrors += errors;
-			totalWarnings += warnings;
-
-			if (file.diagnostics.length > 0) {
-				filesWithIssues++;
-			}
-
-			for (const diagnostic of file.diagnostics) {
-				const line = diagnostic.range.start.line + 1;
-				const char = diagnostic.range.start.character + 1;
-				const severity =
-					diagnostic.severity === SEVERITY.ERROR ? "error" : "warning";
-				const severityColor =
-					diagnostic.severity === SEVERITY.ERROR
-						? ansis.red(severity)
-						: ansis.yellow(severity);
-				const code = diagnostic.code ? ansis.dim(`  (${diagnostic.code})`) : "";
-
-				console.log(
-					`  ${ansis.dim(`${line}:${char}`)}  ${severityColor}  ${diagnostic.message}${code}`,
-				);
-			}
+		const counts = countBySeverity(file.diagnostics);
+		errors += counts.errors;
+		warnings += counts.warnings;
+		fixable += countFixable(file.diagnostics);
+		if (file.diagnostics.length > 0) filesWithIssues++;
+		if (file.fixed) {
+			fixed += file.fixedCount || 0;
+			filesFixed++;
 		}
 	}
 
-	console.log();
+	const lines: string[] = [];
 
-	if (totalErrors === 0 && totalWarnings === 0) {
-		if (totalFixed > 0) {
-			const issueText = `${totalFixed} issue${totalFixed !== 1 ? "s" : ""}`;
-			console.log(ansis.green.bold(`✔ Fixed ${issueText}`));
-		} else {
-			console.log(ansis.green.bold("✔ No issues found"));
-		}
+	if (fixed > 0) {
+		const text = `${plural(fixed, "issue")} in ${plural(filesFixed, "file")}`;
+		lines.push(
+			dryRun
+				? ansis.cyan.bold(`~ Would fix ${text} (dry run, no files written)`)
+				: ansis.green.bold(`✔ Fixed ${text}`),
+		);
+	}
+
+	const problems = errors + warnings;
+	if (problems === 0) {
+		if (fixed === 0) lines.push(ansis.green.bold("✔ No issues found"));
 	} else {
-		const parts = [];
-		if (totalErrors > 0) {
-			parts.push(`${totalErrors} error${totalErrors !== 1 ? "s" : ""}`);
-		}
-		if (totalWarnings > 0) {
-			parts.push(`${totalWarnings} warning${totalWarnings !== 1 ? "s" : ""}`);
-		}
-
-		const fileText = `${filesWithIssues} file${filesWithIssues !== 1 ? "s" : ""}`;
-		const summary = `Found ${parts.join(" and ")} in ${fileText}`;
-
-		if (totalFixed > 0) {
-			const issueText = `${totalFixed} issue${totalFixed !== 1 ? "s" : ""}`;
-			console.log(ansis.green.bold(`✔ Fixed ${issueText}`));
-			console.log(summary);
-		} else {
-			console.log(summary);
+		const color = errors > 0 ? ansis.red.bold : ansis.yellow.bold;
+		lines.push(
+			color(
+				`✖ ${plural(problems, "problem")} (${plural(errors, "error")}, ${plural(warnings, "warning")}) in ${plural(filesWithIssues, "file")}`,
+			),
+		);
+		if (fixable > 0 && !fixMode) {
+			lines.push(
+				ansis.dim(
+					`  ${fixable} potentially fixable with ${ansis.yellow("--fix")} (preview with ${ansis.yellow("--dry-run")})`,
+				),
+			);
 		}
 	}
+
+	lines.push(
+		ansis.dim(
+			`Linted ${plural(totalFilesProcessed, "file")} in ${formatDuration(durationMs)}`,
+		),
+	);
+	return lines;
+}
+
+// Exiting right after a large write can truncate piped stdout (async on
+// macOS), so wait for the write to flush before exiting.
+function writeAndExit(output: string, code: number) {
+	process.stdout.write(output, () => process.exit(code));
 }
 
 const program = new Command();
@@ -207,6 +268,10 @@ program
 		"Auto-discover files from Tailwind config or CSS @source patterns",
 	)
 	.option("--fix", "Automatically fix problems that can be fixed")
+	.option(
+		"--dry-run",
+		"Show which fixes --fix would apply without writing any files",
+	)
 	.option("-v, --verbose", "Enable verbose logging for debugging")
 	.option("--format <format>", "Output format: text or json", "text")
 	.addHelpText(
@@ -218,6 +283,7 @@ ${ansis.bold.cyan("Examples:")}
   ${ansis.dim("$")} tailwind-lint ${ansis.yellow("--config")} ${ansis.green("./tailwind.config.js")}
   ${ansis.dim("$")} tailwind-lint ${ansis.yellow("--config")} ${ansis.green("./src/app.css")}
   ${ansis.dim("$")} tailwind-lint ${ansis.green('"src/**/*.tsx"')} ${ansis.yellow("--fix")}
+  ${ansis.dim("$")} tailwind-lint ${ansis.yellow("--dry-run")}
   ${ansis.dim("$")} tailwind-lint ${ansis.green('"**/*.vue"')}
 
 ${ansis.bold.cyan("Notes:")}
@@ -228,9 +294,10 @@ ${ansis.bold.cyan("Notes:")}
   ${ansis.dim("•")} Default pattern: ${ansis.dim(DEFAULT_FILE_PATTERN)}
   ${ansis.dim("•")} Reads Tailwind workspace settings from ${ansis.dim(".zed/settings.json")} and ${ansis.dim(".vscode/settings.json")}
   ${ansis.dim("•")} Use ${ansis.yellow("--fix")} to automatically resolve fixable issues
+  ${ansis.dim("•")} Use ${ansis.yellow("--dry-run")} to preview fixes without changing files
 `,
 	)
-	.action(async (files: string[], options) => {
+	.action(async (files: string[], options: CliOptions) => {
 		const hasConfigFlag = !!options.config;
 		const hasAutoFlag = !!options.auto;
 		const hasFiles = files.length > 0;
@@ -241,8 +308,10 @@ ${ansis.bold.cyan("Notes:")}
 		}
 
 		const resolved = resolveOptions(files, options);
-		const format = options.format === "json" ? "json" : "text";
-		const isJsonOutput = format === "json";
+		const isJsonOutput = options.format === "json";
+		const showProgress =
+			!isJsonOutput && !resolved.verbose && !!process.stdout.isTTY;
+		const startTime = performance.now();
 
 		try {
 			if (resolved.verbose && !isJsonOutput) {
@@ -252,6 +321,7 @@ ${ansis.bold.cyan("Notes:")}
 					ansis.dim(`  Config path: ${resolved.configPath || "auto-discover"}`),
 				);
 				console.log(ansis.dim(`  Fix mode: ${resolved.fix}`));
+				console.log(ansis.dim(`  Dry run: ${resolved.dryRun}`));
 				console.log(
 					ansis.dim(
 						`  Patterns: ${resolved.patterns.length > 0 ? resolved.patterns.join(", ") : "auto-discover"}`,
@@ -260,109 +330,100 @@ ${ansis.bold.cyan("Notes:")}
 				console.log();
 			}
 
+			if (showProgress) {
+				process.stdout.write(
+					`${ansis.cyan("→")} Loading Tailwind configuration...`,
+				);
+			}
+
 			const results = await lint({
 				...resolved,
 				onProgress: (current, total, file) => {
-					if (isJsonOutput) return;
-
-					if (process.stdout.isTTY && !resolved.verbose) {
-						const displayFile = truncateFilename(file);
+					if (showProgress) {
 						process.stdout.write(
-							`\r${ansis.cyan("→")} Linting files... ${ansis.dim(`(${current}/${total})`)} ${ansis.dim(displayFile)}${" ".repeat(TERMINAL_PADDING)}`,
+							`${CLEAR_LINE}${ansis.cyan("→")} Linting files... ${ansis.dim(`(${current}/${total})`)} ${ansis.dim(truncateFilename(file))}`,
 						);
-					} else if (resolved.verbose) {
+					} else if (resolved.verbose && !isJsonOutput) {
 						console.log(ansis.dim(`  [${current}/${total}] Linting ${file}`));
 					}
 				},
 			});
 
-			if (process.stdout.isTTY && !resolved.verbose && !isJsonOutput) {
-				process.stdout.write(`\r${" ".repeat(TERMINAL_WIDTH)}\r`);
+			if (showProgress) {
+				process.stdout.write(CLEAR_LINE);
 			}
 
-			if (results.skippedFiles.length > 0 && !isJsonOutput) {
-				for (const skipped of results.skippedFiles) {
-					console.log(
-						ansis.yellow(
-							`⚠ Skipped ${truncateFilename(skipped)} (exceeds size limit)`,
-						),
-					);
-				}
-			}
-
-			if (results.totalFilesProcessed === 0) {
-				if (isJsonOutput) {
-					console.log(
-						JSON.stringify(
-							createJsonOutput({
-								...resolved,
-								files: [],
-								totalFilesProcessed: 0,
-								skippedFiles: results.skippedFiles,
-							}),
-						),
-					);
-				} else {
-					console.log();
-					console.log(ansis.yellow("⚠ No files found to lint"));
-				}
-				process.exit(0);
-			}
-
-			if (results.files.length === 0) {
-				if (isJsonOutput) {
-					console.log(
-						JSON.stringify(
-							createJsonOutput({
-								...resolved,
-								files: [],
-								totalFilesProcessed: results.totalFilesProcessed,
-								skippedFiles: results.skippedFiles,
-							}),
-						),
-					);
-				} else {
-					console.log(ansis.green.bold("✔ No issues found"));
-				}
-				process.exit(0);
-			}
+			const hasErrors = results.files.some((file) =>
+				file.diagnostics.some((d) => d.severity === SEVERITY.ERROR),
+			);
+			const exitCode = hasErrors ? 1 : 0;
 
 			if (isJsonOutput) {
-				console.log(
-					JSON.stringify(
+				return writeAndExit(
+					`${JSON.stringify(
 						createJsonOutput({
 							...resolved,
 							files: results.files,
 							totalFilesProcessed: results.totalFilesProcessed,
 							skippedFiles: results.skippedFiles,
 						}),
-					),
+					)}\n`,
+					exitCode,
 				);
-			} else {
-				await displayResults(results.files, resolved.fix);
 			}
 
-			const hasErrors = results.files.some((file) =>
-				file.diagnostics.some((d) => d.severity === SEVERITY.ERROR),
+			const lines: string[] = [];
+			for (const skipped of results.skippedFiles) {
+				lines.push(
+					ansis.yellow(
+						`⚠ Skipped ${truncateFilename(skipped)} (exceeds size limit)`,
+					),
+				);
+			}
+
+			if (results.totalFilesProcessed === 0) {
+				lines.push(ansis.yellow("⚠ No files found to lint"));
+				return writeAndExit(`${lines.join("\n")}\n`, 0);
+			}
+
+			for (const file of results.files) {
+				lines.push("", ...formatFile(file, resolved.dryRun));
+			}
+			if (results.files.length > 0) lines.push("");
+
+			lines.push(
+				...formatSummary(
+					results.files,
+					results.totalFilesProcessed,
+					performance.now() - startTime,
+					resolved.fix,
+					resolved.dryRun,
+				),
 			);
-			process.exit(hasErrors ? 1 : 0);
+
+			return writeAndExit(`${lines.join("\n")}\n`, exitCode);
 		} catch (error) {
+			if (showProgress) {
+				process.stdout.write(CLEAR_LINE);
+			}
+
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
 			if (isJsonOutput) {
-				console.log(
-					JSON.stringify(
+				return writeAndExit(
+					`${JSON.stringify(
 						createJsonErrorOutput({
 							error: errorMessage,
 							...resolved,
 						}),
-					),
+					)}\n`,
+					1,
 				);
-			} else {
-				console.error(ansis.red("✖ Error:"), errorMessage);
 			}
 
-			if (resolved.verbose && error instanceof Error && !isJsonOutput) {
+			console.error(ansis.red("✖ Error:"), errorMessage);
+
+			if (resolved.verbose && error instanceof Error) {
 				console.error(ansis.dim("\nStack trace:"));
 				console.error(ansis.dim(error.stack || error.toString()));
 			}

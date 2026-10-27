@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { State } from "@tailwindcss/language-service";
 import { doValidate } from "@tailwindcss/language-service";
@@ -33,7 +34,6 @@ import {
 	getFileSize,
 	readFileSync,
 	readGitignorePatterns,
-	writeFileSync,
 } from "./utils/fs";
 
 const SOURCE_FILE_PATTERN = "**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}";
@@ -193,7 +193,10 @@ function extractContentPatterns(config: TailwindConfig) {
 	return content.filter((p): p is string => typeof p === "string");
 }
 
-function extractSourcePatterns(cssContent: string) {
+function extractSourcePatterns(cssContent: string): {
+	include: string[];
+	exclude: string[];
+} {
 	const include: string[] = [];
 	const exclude: string[] = [];
 	const sourceRegex = /@source\s+(not\s+)?(?:inline\(|["']([^"']+)["'])/g;
@@ -214,7 +217,10 @@ function extractSourcePatterns(cssContent: string) {
 	return { include, exclude };
 }
 
-function extractImportSourceDirectives(cssContent: string) {
+function extractImportSourceDirectives(cssContent: string): {
+	roots: string[];
+	disableAutoSource: boolean;
+} {
 	const roots: string[] = [];
 	let disableAutoSource = false;
 	const importSourceRegex =
@@ -246,28 +252,39 @@ async function processFiles(
 	cwd: string,
 	files: string[],
 	fix: boolean,
+	dryRun: boolean,
 	onProgress?: (current: number, total: number, file: string) => void,
 ) {
-	const results: LintFileResult[] = [];
+	const results: (LintFileResult | null)[] = Array.from({
+		length: files.length,
+	});
+	let next = 0;
+	let started = 0;
 
-	for (let i = 0; i < files.length; i += CONCURRENT_FILES) {
-		const batch = files.slice(i, i + CONCURRENT_FILES);
+	// A pool keeps CONCURRENT_FILES files in flight, so one slow file does
+	// not stall a whole batch while its file I/O overlaps with validation.
+	const worker = async () => {
+		while (next < files.length) {
+			const index = next++;
+			const file = files[index];
+			onProgress?.(++started, files.length, file);
+			results[index] = await processFile(state, cwd, file, fix, dryRun);
+		}
+	};
 
-		const batchResults = await Promise.all(
-			batch.map(async (file, batchIndex) => {
-				if (onProgress) {
-					onProgress(i + batchIndex + 1, files.length, file);
-				}
-				return processFile(state, cwd, file, fix);
-			}),
-		);
+	await Promise.all(
+		Array.from({ length: Math.min(CONCURRENT_FILES, files.length) }, worker),
+	);
 
-		results.push(
-			...(batchResults.filter((r) => r !== null) as LintFileResult[]),
-		);
+	return results.filter((result): result is LintFileResult => result !== null);
+}
+
+async function readFileIfExists(filePath: string) {
+	try {
+		return await fs.readFile(filePath, "utf-8");
+	} catch {
+		return null;
 	}
-
-	return results;
 }
 
 async function processFile(
@@ -275,19 +292,25 @@ async function processFile(
 	cwd: string,
 	filePath: string,
 	fix: boolean,
-) {
+	dryRun: boolean,
+): Promise<LintFileResult | null> {
 	const absolutePath = path.isAbsolute(filePath)
 		? filePath
 		: path.resolve(cwd, filePath);
 
-	if (!fileExists(absolutePath)) {
+	const content = await readFileIfExists(absolutePath);
+	if (content === null) {
 		return null;
 	}
 
-	const content = readFileSync(absolutePath);
-	let diagnostics = await validateDocument(state, absolutePath, content);
+	let diagnostics: LintFileResult["diagnostics"] = await validateDocument(
+		state,
+		absolutePath,
+		content,
+	);
 
 	let fixedCount = 0;
+	let fixedContent: string | undefined;
 
 	if (fix && diagnostics.length > 0) {
 		const fixResult = await applyCodeActions(
@@ -298,13 +321,13 @@ async function processFile(
 		);
 
 		if (fixResult.changed) {
-			writeFileSync(absolutePath, fixResult.content);
+			if (dryRun) {
+				fixedContent = fixResult.content;
+			} else {
+				await fs.writeFile(absolutePath, fixResult.content, "utf-8");
+			}
 			fixedCount = fixResult.fixedCount;
-			diagnostics = await validateDocument(
-				state,
-				absolutePath,
-				fixResult.content,
-			);
+			diagnostics = fixResult.diagnostics;
 		}
 	}
 
@@ -313,8 +336,13 @@ async function processFile(
 		diagnostics,
 		fixed: fixedCount > 0,
 		fixedCount,
+		...(fixedContent !== undefined && {
+			originalContent: content,
+			fixedContent,
+		}),
 	};
 }
+
 async function initializeState(
 	cwd: string,
 	target: TailwindConfigTarget,
@@ -341,6 +369,7 @@ export async function lint({
 	configPath,
 	autoDiscover,
 	fix = false,
+	dryRun = false,
 	verbose = false,
 	onProgress,
 }: LintOptions): Promise<LintResult> {
@@ -413,7 +442,8 @@ export async function lint({
 			state,
 			cwd,
 			files.sort((a, b) => a.localeCompare(b)),
-			fix,
+			fix || dryRun,
+			dryRun,
 			onProgress &&
 				((current, _total, file) =>
 					onProgress(offset + current, totalFiles, file)),

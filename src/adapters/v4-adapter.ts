@@ -69,6 +69,29 @@ function fromPostcss(nodes: postcss.ChildNode[]): unknown[] {
 	});
 }
 
+type CanonicalizeFn = (candidates: string[], options?: unknown) => string[];
+
+// Note: getVariantOrder must not be cached, it grows as new variants are parsed
+function memoizeCanonicalize(designSystem: DesignSystem) {
+	const canonicalize = designSystem.canonicalizeCandidates;
+	if (typeof canonicalize === "function") {
+		const cache = new Map<string, string[]>();
+		designSystem.canonicalizeCandidates = ((candidates, options) => {
+			const key = `${JSON.stringify(options ?? null)}\0${candidates.join(" ")}`;
+			let result = cache.get(key);
+			if (!result) {
+				result = (canonicalize as CanonicalizeFn).call(
+					designSystem,
+					candidates,
+					options,
+				);
+				cache.set(key, result);
+			}
+			return [...result];
+		}) satisfies CanonicalizeFn;
+	}
+}
+
 export async function loadV4DesignSystem(
 	state: State,
 	resolvePaths: string[],
@@ -171,25 +194,44 @@ export async function loadV4DesignSystem(
 				},
 			});
 
+			const compileUncached = (classes: string[]): unknown[][] => {
+				if (designSystem.candidatesToAst) {
+					return designSystem.candidatesToAst(classes);
+				}
+
+				if (designSystem.candidatesToCss) {
+					return designSystem.candidatesToCss(classes).map((css) => {
+						if (!css) return [];
+						try {
+							return fromPostcss(postcss.parse(css).nodes);
+						} catch {
+							return [];
+						}
+					});
+				}
+
+				return classes.map(() => []);
+			};
+
+			memoizeCanonicalize(designSystem);
+
+			// The language service compiles every class list of every file, and
+			// each compile re-sorts all variants. The design system is fixed
+			// after loading, so per-class results can be shared across files.
+			const compileCache = new Map<string, unknown[]>();
 			Object.assign(designSystem, {
 				dependencies: () => new Set<string>(),
 				compile(classes: string[]): unknown[][] {
-					if (designSystem.candidatesToAst) {
-						return designSystem.candidatesToAst(classes);
+					const missing = [
+						...new Set(classes.filter((c) => !compileCache.has(c))),
+					];
+					if (missing.length > 0) {
+						const compiled = compileUncached(missing);
+						for (const [index, className] of missing.entries()) {
+							compileCache.set(className, compiled[index] ?? []);
+						}
 					}
-
-					if (designSystem.candidatesToCss) {
-						return designSystem.candidatesToCss(classes).map((css) => {
-							if (!css) return [];
-							try {
-								return fromPostcss(postcss.parse(css).nodes);
-							} catch {
-								return [];
-							}
-						});
-					}
-
-					return classes.map(() => []);
+					return classes.map((c) => compileCache.get(c) ?? []);
 				},
 			});
 

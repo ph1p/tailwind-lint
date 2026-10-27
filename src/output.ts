@@ -26,6 +26,7 @@ interface JsonSummary {
 	errors: number;
 	warnings: number;
 	fixed: number;
+	fixable: number;
 	filesWithIssues: number;
 	totalFilesProcessed: number;
 }
@@ -39,6 +40,7 @@ interface JsonLintOutput {
 		configPath: string | null;
 		autoDiscover: boolean;
 		fix: boolean;
+		dryRun: boolean;
 		patterns: string[];
 	};
 	files: JsonLintFileResult[];
@@ -57,6 +59,19 @@ export function countBySeverity(diagnostics: Diagnostic[]) {
 	return { errors, warnings };
 }
 
+// Diagnostics the language service offers a quickfix for
+const ALWAYS_FIXABLE_CODES = new Set(["cssConflict", "invalidApply"]);
+
+export function isFixable(diagnostic: Diagnostic) {
+	if (ALWAYS_FIXABLE_CODES.has(String(diagnostic.code))) return true;
+	const { suggestions } = diagnostic as Diagnostic & { suggestions?: unknown };
+	return Array.isArray(suggestions) && suggestions.length > 0;
+}
+
+export function countFixable(diagnostics: Diagnostic[]) {
+	return diagnostics.filter(isFixable).length;
+}
+
 function toJsonSeverity(severity: number | undefined): JsonSeverity {
 	if (severity === SEVERITY.ERROR) return "error";
 	if (severity === SEVERITY.WARNING) return "warning";
@@ -71,7 +86,10 @@ export function toJsonDiagnostic(diagnostic: Diagnostic): JsonDiagnostic {
 		endColumn: diagnostic.range.end.character + 1,
 		severity: toJsonSeverity(diagnostic.severity),
 		code: diagnostic.code ?? null,
-		message: diagnostic.message,
+		message:
+			typeof diagnostic.message === "string"
+				? diagnostic.message
+				: diagnostic.message.value,
 		source: diagnostic.source,
 	};
 }
@@ -84,6 +102,7 @@ export function createJsonOutput({
 	configPath,
 	autoDiscover,
 	fix,
+	dryRun = false,
 	patterns,
 }: {
 	files: LintFileResult[];
@@ -93,11 +112,13 @@ export function createJsonOutput({
 	configPath?: string;
 	autoDiscover: boolean;
 	fix: boolean;
+	dryRun?: boolean;
 	patterns: string[];
 }): JsonLintOutput {
 	let errors = 0;
 	let warnings = 0;
 	let fixed = 0;
+	let fixable = 0;
 	let filesWithIssues = 0;
 
 	const mappedFiles = files.map((file) => {
@@ -105,6 +126,7 @@ export function createJsonOutput({
 		errors += severityCount.errors;
 		warnings += severityCount.warnings;
 		fixed += file.fixedCount || 0;
+		fixable += countFixable(file.diagnostics);
 
 		if (file.diagnostics.length > 0) {
 			filesWithIssues++;
@@ -124,6 +146,7 @@ export function createJsonOutput({
 			errors,
 			warnings,
 			fixed,
+			fixable,
 			filesWithIssues,
 			totalFilesProcessed,
 		},
@@ -132,6 +155,7 @@ export function createJsonOutput({
 			configPath: configPath || null,
 			autoDiscover,
 			fix,
+			dryRun,
 			patterns,
 		},
 		files: mappedFiles,
@@ -145,6 +169,7 @@ export function createJsonErrorOutput({
 	configPath,
 	autoDiscover,
 	fix,
+	dryRun = false,
 	patterns,
 }: {
 	error: string;
@@ -152,6 +177,7 @@ export function createJsonErrorOutput({
 	configPath?: string;
 	autoDiscover: boolean;
 	fix: boolean;
+	dryRun?: boolean;
 	patterns: string[];
 }): JsonLintOutput {
 	return {
@@ -161,6 +187,7 @@ export function createJsonErrorOutput({
 			errors: 0,
 			warnings: 0,
 			fixed: 0,
+			fixable: 0,
 			filesWithIssues: 0,
 			totalFilesProcessed: 0,
 		},
@@ -169,6 +196,7 @@ export function createJsonErrorOutput({
 			configPath: configPath || null,
 			autoDiscover,
 			fix,
+			dryRun,
 			patterns,
 		},
 		files: [],

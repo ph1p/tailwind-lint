@@ -1,6 +1,10 @@
 import type { State } from "@tailwindcss/language-service";
 import { doCodeActions, doValidate } from "@tailwindcss/language-service";
-import type { CodeActionParams, Diagnostic } from "vscode-languageserver";
+import type {
+	CodeActionParams,
+	Diagnostic,
+	TextEdit,
+} from "vscode-languageserver";
 import { TextDocument } from "vscode-languageserver-textdocument";
 import {
 	getLanguageId,
@@ -13,9 +17,16 @@ export type { ApplyCodeActionsResult };
 
 interface QuickfixAction {
 	kind?: string;
+	diagnostics?: Diagnostic[];
 	edit?: {
-		changes?: Record<string, unknown[]>;
+		changes?: Record<string, TextEdit[]>;
 	};
+}
+
+interface OffsetEdit {
+	start: number;
+	end: number;
+	newText: string;
 }
 
 async function getQuickfixes(
@@ -51,7 +62,13 @@ async function getQuickfixes(
 		},
 	};
 
-	const codeActions = await doCodeActions(state, params, document);
+	// vscode-languageserver (3.18 types) allows MarkupContent messages, the
+	// language service still expects 3.17 types
+	const codeActions = await doCodeActions(
+		state,
+		params as Parameters<typeof doCodeActions>[1],
+		document,
+	);
 
 	return codeActions.filter(
 		(action) =>
@@ -60,45 +77,67 @@ async function getQuickfixes(
 	) as QuickfixAction[];
 }
 
-function applyFirstQuickfix(
-	action: QuickfixAction,
+function diagnosticKey(diagnostic: Diagnostic) {
+	const { start, end } = diagnostic.range;
+	return `${diagnostic.code}:${start.line}:${start.character}:${end.line}:${end.character}:${diagnostic.message}`;
+}
+
+function overlaps(a: OffsetEdit, b: OffsetEdit) {
+	// Edits starting at the same offset have no well-defined order
+	return a.start === b.start || (a.start < b.end && b.start < a.end);
+}
+
+/**
+ * Picks the first quickfix for every diagnostic and keeps only those whose
+ * edits do not overlap, so a single validation pass can fix many issues.
+ * Overlapping fixes (e.g. two cssConflict fixes rewriting the same class list)
+ * are left for the next pass, which sees the updated document.
+ */
+function selectNonOverlappingEdits(
+	actions: QuickfixAction[],
 	uri: string,
 	document: TextDocument,
-	content: string,
 ) {
-	if (!action.edit?.changes?.[uri]) return null;
+	const handled = new Set<string>();
+	const accepted: OffsetEdit[] = [];
+	let fixCount = 0;
 
-	const edits = action.edit.changes[uri] as {
-		range: {
-			start: {
-				line: number;
-				character: number;
-			};
-			end: {
-				line: number;
-				character: number;
-			};
-		};
-		newText: string;
-	}[];
+	for (const action of actions) {
+		const edits = action.edit?.changes?.[uri];
+		if (!edits || edits.length === 0) continue;
 
-	const sortedEdits = [...edits].sort((a, b) => {
-		const lineDiff = b.range.start.line - a.range.start.line;
-		if (lineDiff !== 0) return lineDiff;
-		return b.range.start.character - a.range.start.character;
-	});
+		const keys = (action.diagnostics ?? []).map(diagnosticKey);
+		if (keys.some((key) => handled.has(key))) continue;
 
-	let newContent = content;
-	for (const edit of sortedEdits) {
-		const startOffset = document.offsetAt(edit.range.start);
-		const endOffset = document.offsetAt(edit.range.end);
-		newContent =
-			newContent.substring(0, startOffset) +
-			edit.newText +
-			newContent.substring(endOffset);
+		const offsetEdits = edits.map((edit) => ({
+			start: document.offsetAt(edit.range.start),
+			end: document.offsetAt(edit.range.end),
+			newText: edit.newText,
+		}));
+		const conflicts = offsetEdits.some((edit, index) =>
+			[...accepted, ...offsetEdits.slice(0, index)].some((other) =>
+				overlaps(edit, other),
+			),
+		);
+		if (conflicts) continue;
+
+		for (const key of keys) handled.add(key);
+		accepted.push(...offsetEdits);
+		fixCount++;
 	}
 
-	return { content: newContent };
+	return { edits: accepted, fixCount };
+}
+
+function applyEdits(content: string, edits: OffsetEdit[]) {
+	const sorted = [...edits].sort((a, b) => a.start - b.start);
+	let result = "";
+	let cursor = 0;
+	for (const edit of sorted) {
+		result += content.slice(cursor, edit.start) + edit.newText;
+		cursor = edit.end;
+	}
+	return result + content.slice(cursor);
 }
 
 export async function applyCodeActions(
@@ -112,6 +151,7 @@ export async function applyCodeActions(
 			content,
 			changed: false,
 			fixedCount: 0,
+			diagnostics,
 		};
 	}
 
@@ -120,13 +160,24 @@ export async function applyCodeActions(
 		const uri = `file://${filePath}`;
 		let currentDocument = TextDocument.create(uri, languageId, 1, content);
 		let currentContent = content;
+		// The caller already validated the original content, so reuse it
+		let currentDiagnostics = diagnostics;
 		let totalFixed = 0;
 
 		// Keep fixing until no more fixable issues remain
 		// Add iteration limit to prevent infinite loops
-		for (let iteration = 0; iteration < MAX_FIX_ITERATIONS; iteration++) {
-			const currentDiagnostics = await doValidate(state, currentDocument);
+		for (let iteration = 0; ; iteration++) {
+			if (iteration > 0) {
+				currentDiagnostics = await doValidate(state, currentDocument);
+			}
 			if (currentDiagnostics.length === 0) break;
+
+			if (iteration === MAX_FIX_ITERATIONS) {
+				console.warn(
+					`Warning: Reached maximum fix iterations (${MAX_FIX_ITERATIONS}) for ${filePath}. Some issues may remain unfixed.`,
+				);
+				break;
+			}
 
 			const quickfixes = await getQuickfixes(
 				state,
@@ -134,37 +185,28 @@ export async function applyCodeActions(
 				uri,
 				currentDiagnostics,
 			);
-			if (quickfixes.length === 0) break;
-
-			const fixResult = applyFirstQuickfix(
-				quickfixes[0],
+			const { edits, fixCount } = selectNonOverlappingEdits(
+				quickfixes,
 				uri,
 				currentDocument,
-				currentContent,
 			);
-			if (!fixResult) break;
+			if (fixCount === 0) break;
 
-			currentContent = fixResult.content;
+			currentContent = applyEdits(currentContent, edits);
 			currentDocument = TextDocument.create(
 				uri,
 				languageId,
 				currentDocument.version + 1,
 				currentContent,
 			);
-			totalFixed++;
-
-			// Safety check: warn if approaching iteration limit
-			if (iteration === MAX_FIX_ITERATIONS - 1) {
-				console.warn(
-					`Warning: Reached maximum fix iterations (${MAX_FIX_ITERATIONS}) for ${filePath}. Some issues may remain unfixed.`,
-				);
-			}
+			totalFixed += fixCount;
 		}
 
 		return {
 			content: currentContent,
 			changed: currentContent !== content,
 			fixedCount: totalFixed,
+			diagnostics: currentDiagnostics,
 		};
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
@@ -178,6 +220,7 @@ export async function applyCodeActions(
 				content,
 				changed: false,
 				fixedCount: 0,
+				diagnostics,
 			};
 		}
 

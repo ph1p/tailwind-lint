@@ -20,6 +20,8 @@ export interface ApplyCodeActionsResult {
 	content: string;
 	changed: boolean;
 	fixedCount: number;
+	/** Diagnostics remaining for `content` */
+	diagnostics: Diagnostic[];
 }
 
 export interface LintFileResult {
@@ -27,6 +29,10 @@ export interface LintFileResult {
 	diagnostics: Diagnostic[];
 	fixed?: boolean;
 	fixedCount?: number;
+	/** Content before fixing; only set in dry-run mode when fixes are available */
+	originalContent?: string;
+	/** Content after fixing; only set in dry-run mode when fixes are available */
+	fixedContent?: string;
 }
 
 export interface LintOptions {
@@ -35,6 +41,8 @@ export interface LintOptions {
 	configPath?: string;
 	autoDiscover: boolean;
 	fix?: boolean;
+	/** Compute fixes without writing them to disk (implies `fix`) */
+	dryRun?: boolean;
 	verbose?: boolean;
 	onProgress?: (current: number, total: number, file: string) => void;
 }

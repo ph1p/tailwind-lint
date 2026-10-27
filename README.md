@@ -75,6 +75,7 @@ tailwind-lint --verbose
 - `-c, --config <path>` - Path to Tailwind config file (default: auto-discover)
 - `-a, --auto` - Auto-discover files from the resolved Tailwind config or CSS `@source` directives
 - `--fix` - Automatically fix problems that can be fixed
+- `--dry-run` - Show the fixes `--fix` would apply (with a line diff) without writing any files
 - `--format <text|json>` - Output format (`text` default, `json` for machine-readable output)
 - `-v, --verbose` - Enable verbose logging for debugging
 - `-h, --help` - Show help message
@@ -94,6 +95,9 @@ tailwind-lint --config ./src/app.css
 
 # Lint and fix specific file types
 tailwind-lint "**/*.vue" --fix
+
+# Preview fixes without changing files
+tailwind-lint --dry-run
 
 # Lint with a specific CSS config (v4)
 tailwind-lint --config ./styles/app.css
@@ -116,8 +120,8 @@ tailwind-lint --auto --format json
 The JSON payload includes:
 
 - `ok` - `true` when no errors are found
-- `summary` - counts for `errors`, `warnings`, `fixed`, `filesWithIssues`, `totalFilesProcessed`
-- `config` - resolved runtime values (`cwd`, `configPath`, `autoDiscover`, `fix`, `patterns`)
+- `summary` - counts for `errors`, `warnings`, `fixable`, `fixed`, `filesWithIssues`, `totalFilesProcessed`
+- `config` - resolved runtime values (`cwd`, `configPath`, `autoDiscover`, `fix`, `dryRun`, `patterns`)
 - `files[]` - per-file diagnostics with 1-based `line`/`column` ranges
 
 On JSON errors, the CLI keeps the same top-level shape and adds `error` so agent integrations do not need a separate parser for failure cases.
@@ -228,7 +232,9 @@ Use `--fix` to automatically resolve issues:
 - **Canonical class suggestions** (v4) - Replaces arbitrary values with standard classes
 - **Recommended variant order** (v3 & v4) - Reorders variants correctly
 
-Files are written atomically with multiple iterations to ensure all fixes are applied. The autofix process has a safety limit of 100 iterations per file to prevent infinite loops.
+Use `--dry-run` to preview the changes without writing them.
+
+Fixes that do not overlap are applied together, and files are revalidated until no fixable issues remain. The autofix process has a safety limit of 100 iterations per file to prevent infinite loops.
 
 ## Features
 
