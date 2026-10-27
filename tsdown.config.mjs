@@ -8,5 +8,6 @@ export default defineConfig({
 	clean: true,
 	sourcemap: false,
 	inlineOnly: false,
+	tsconfig: "tsconfig.build.json",
 	dts: true,
 });
