@@ -107,3 +107,20 @@ describe("Canonical Class Suggestions", () => {
 		expect(topDiagnostic?.range.start.line).toBeGreaterThanOrEqual(0);
 	});
 });
+
+describe("Root font size", () => {
+	const testV4Dir = path.resolve(__dirname, "fixtures/v4");
+
+	it("should use the rootFontSize option for px conversions", async () => {
+		const result = await lint({
+			cwd: testV4Dir,
+			patterns: ["src/arbitrary-values.html"],
+			autoDiscover: false,
+			rootFontSize: 8,
+		});
+
+		expect(result.files[0].diagnostics.map((d) => d.message)).toContainEqual(
+			"The class `p-[16px]` can be written as `p-8`",
+		);
+	});
+});

@@ -35,6 +35,8 @@ import {
 	readFileSync,
 	readGitignorePatterns,
 } from "./utils/fs";
+import { type RootFontSize, detectRootFontSize } from "./utils/root-font-size";
+import { loadWorkspaceTailwindSettings } from "./utils/settings";
 
 const SOURCE_FILE_PATTERN = "**/*.{js,jsx,ts,tsx,html,vue,svelte,astro,mdx}";
 const GLOB_PATTERN_REGEX = /[*?[\]{}]/;
@@ -347,9 +349,10 @@ async function initializeState(
 	cwd: string,
 	target: TailwindConfigTarget,
 	verbose = false,
+	rootFontSize?: RootFontSize,
 ) {
 	try {
-		const state = await createState(cwd, target, verbose);
+		const state = await createState(cwd, target, verbose, rootFontSize);
 		if (verbose) {
 			console.log();
 		}
@@ -371,8 +374,17 @@ export async function lint({
 	fix = false,
 	dryRun = false,
 	verbose = false,
+	rootFontSize,
 	onProgress,
 }: LintOptions): Promise<LintResult> {
+	const settingsRootFontSize = loadWorkspaceTailwindSettings(cwd).rootFontSize;
+	const configuredRootFontSize: RootFontSize | undefined =
+		rootFontSize !== undefined
+			? { size: rootFontSize, source: "--root-font-size" }
+			: settingsRootFontSize !== undefined
+				? { size: settingsRootFontSize, source: "editor settings" }
+				: undefined;
+
 	const targets = await resolveConfigTargets(cwd, configPath);
 	if (verbose) {
 		logTargets(cwd, targets);
@@ -437,7 +449,13 @@ export async function lint({
 
 		const offset = processedCount;
 		processedCount += files.length;
-		const state = await initializeState(cwd, target, verbose);
+		const state = await initializeState(
+			cwd,
+			target,
+			verbose,
+			configuredRootFontSize ??
+				(await detectRootFontSize(cwd, target.path, files)),
+		);
 		const processed = await processFiles(
 			state,
 			cwd,

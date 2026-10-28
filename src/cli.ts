@@ -3,7 +3,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import ansis from "ansis";
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 import { DEFAULT_FILE_PATTERN, DEFAULT_VERSION, SEVERITY } from "./constants";
 import { diffLines } from "./diff";
 import { lint } from "./linter";
@@ -27,6 +27,7 @@ interface CliOptions {
 	dryRun?: boolean;
 	verbose?: boolean;
 	format?: "text" | "json";
+	rootFontSize?: number;
 }
 
 function resolveOptions(files: string[], options: CliOptions) {
@@ -55,6 +56,7 @@ function resolveOptions(files: string[], options: CliOptions) {
 		fix: options.fix || dryRun,
 		dryRun,
 		verbose: options.verbose || false,
+		rootFontSize: options.rootFontSize,
 	};
 }
 
@@ -203,6 +205,14 @@ function writeAndExit(output: string, code: number) {
 	process.stdout.write(output, () => process.exit(code));
 }
 
+function parseRootFontSize(value: string) {
+	const size = Number(value);
+	if (!(size > 0)) {
+		throw new InvalidArgumentError("Must be a positive number.");
+	}
+	return size;
+}
+
 const program = new Command();
 
 const getVersion = (): string => {
@@ -272,6 +282,11 @@ program
 		"--dry-run",
 		"Show which fixes --fix would apply without writing any files",
 	)
+	.option(
+		"--root-font-size <px>",
+		"Root font size in px for rem conversions (default: auto-detect, else 16)",
+		parseRootFontSize,
+	)
 	.option("-v, --verbose", "Enable verbose logging for debugging")
 	.option("--format <format>", "Output format: text or json", "text")
 	.addHelpText(
@@ -295,6 +310,7 @@ ${ansis.bold.cyan("Notes:")}
   ${ansis.dim("•")} Reads Tailwind workspace settings from ${ansis.dim(".zed/settings.json")} and ${ansis.dim(".vscode/settings.json")}
   ${ansis.dim("•")} Use ${ansis.yellow("--fix")} to automatically resolve fixable issues
   ${ansis.dim("•")} Use ${ansis.yellow("--dry-run")} to preview fixes without changing files
+  ${ansis.dim("•")} Root font size: ${ansis.yellow("--root-font-size")}, else editor settings, else detected from ${ansis.dim("<html>")} or CSS
 `,
 	)
 	.action(async (files: string[], options: CliOptions) => {

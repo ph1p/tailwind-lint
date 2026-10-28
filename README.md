@@ -181,6 +181,7 @@ Supported settings:
 - `includeLanguages`
 - `files.exclude`
 - `lint`
+- `rootFontSize`
 
 Zed format:
 

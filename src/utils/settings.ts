@@ -9,6 +9,7 @@ type TailwindSettingsPatch = {
 	includeLanguages?: TailwindCssSettings["includeLanguages"];
 	classAttributes?: TailwindCssSettings["classAttributes"];
 	classFunctions?: TailwindCssSettings["classFunctions"];
+	rootFontSize?: TailwindCssSettings["rootFontSize"];
 	experimental?: Partial<TailwindCssSettings["experimental"]>;
 	files?: Partial<TailwindCssSettings["files"]>;
 	lint?: Partial<TailwindCssSettings["lint"]>;
@@ -39,6 +40,7 @@ function readVsCodeTailwindSettings(cwd: string): TailwindSettingsPatch {
 		includeLanguages: asStringRecord(raw["tailwindCSS.includeLanguages"]),
 		classAttributes: asStringArray(raw["tailwindCSS.classAttributes"]),
 		classFunctions: asStringArray(raw["tailwindCSS.classFunctions"]),
+		rootFontSize: asPositiveNumber(raw["tailwindCSS.rootFontSize"]),
 		experimental: {
 			classRegex: asClassRegex(experimental?.classRegex),
 			configFile: asConfigFile(experimental?.configFile),
@@ -72,6 +74,7 @@ function readZedTailwindSettings(cwd: string): TailwindSettingsPatch {
 		includeLanguages: asStringRecord(normalized.includeLanguages),
 		classAttributes: asStringArray(normalized.classAttributes),
 		classFunctions: asStringArray(normalized.classFunctions),
+		rootFontSize: asPositiveNumber(normalized.rootFontSize),
 		experimental: {
 			classRegex: asClassRegex(asRecord(normalized.experimental)?.classRegex),
 			configFile: asConfigFile(asRecord(normalized.experimental)?.configFile),
@@ -132,6 +135,10 @@ function asStringArray(value: unknown): string[] | undefined {
 	return Array.isArray(value) && value.every((item) => typeof item === "string")
 		? value
 		: undefined;
+}
+
+function asPositiveNumber(value: unknown): number | undefined {
+	return typeof value === "number" && value > 0 ? value : undefined;
 }
 
 function asClassRegex(
@@ -221,6 +228,10 @@ function mergeTailwindSettings(
 				acc.classFunctions,
 				patch.classFunctions,
 			);
+		}
+
+		if (patch.rootFontSize !== undefined) {
+			acc.rootFontSize = patch.rootFontSize;
 		}
 
 		if (patch.experimental) {

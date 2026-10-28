@@ -44,6 +44,8 @@ export interface LintOptions {
 	/** Compute fixes without writing them to disk (implies `fix`) */
 	dryRun?: boolean;
 	verbose?: boolean;
+	/** Root font size in px; overrides editor settings and auto-detection */
+	rootFontSize?: number;
 	onProgress?: (current: number, total: number, file: string) => void;
 }
 

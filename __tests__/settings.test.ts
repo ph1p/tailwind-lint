@@ -59,6 +59,7 @@ describe("workspace tailwind settings", () => {
 			`{
 				// VS Code style settings
 				"tailwindCSS.classFunctions": ["cn"],
+				"tailwindCSS.rootFontSize": 10,
 				"tailwindCSS.experimental": {
 					"classRegex": ["tw=\\"([^\\"]*)\\""]
 				},
@@ -71,6 +72,7 @@ describe("workspace tailwind settings", () => {
 
 		expect(loadWorkspaceTailwindSettings(tmpDir)).toEqual({
 			classFunctions: ["cn"],
+			rootFontSize: 10,
 			experimental: {
 				classRegex: ['tw="([^"]*)"'],
 			},

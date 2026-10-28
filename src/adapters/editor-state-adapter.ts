@@ -15,7 +15,10 @@ function isDirectory(filePath: string) {
 	}
 }
 
-export function createEditorState(cwd: string): EditorState {
+export function createEditorState(
+	cwd: string,
+	rootFontSize?: number,
+): EditorState {
 	const defaultSettings: Settings = {
 		editor: {
 			tabSize: DEFAULT_TAB_SIZE,
@@ -83,6 +86,9 @@ export function createEditorState(cwd: string): EditorState {
 		defaultSettings,
 		loadWorkspaceTailwindSettings(cwd),
 	);
+	if (rootFontSize !== undefined) {
+		settings.tailwindCSS.rootFontSize = rootFontSize;
+	}
 
 	return {
 		connection: null as unknown as EditorState["connection"],

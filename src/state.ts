@@ -8,6 +8,7 @@ import { loadV4DesignSystem } from "./adapters/v4-adapter";
 import { DEFAULT_SEPARATOR } from "./constants";
 import type { ResolvedTailwindConfig, TailwindConfig } from "./types";
 import { type TailwindConfigTarget, loadTailwindConfig } from "./utils/config";
+import type { RootFontSize } from "./utils/root-font-size";
 
 const require = createRequire(import.meta.url || __filename);
 
@@ -64,6 +65,7 @@ export async function createState(
 	cwd: string,
 	target: TailwindConfigTarget,
 	verbose = false,
+	rootFontSize?: RootFontSize,
 ): Promise<State> {
 	const isCssConfig = target.kind !== "js";
 	// Config's package first: monorepo packages may pin different Tailwind versions
@@ -78,6 +80,13 @@ export async function createState(
 		console.log(ansis.dim(`  Version: ${version || "unknown"}`));
 		console.log(ansis.dim(`  Config type: ${CONFIG_TYPE_LABELS[target.kind]}`));
 		console.log(ansis.dim(`  Config path: ${target.path}`));
+		if (rootFontSize) {
+			console.log(
+				ansis.dim(
+					`  Root font size: ${rootFontSize.size}px (${rootFontSize.source})`,
+				),
+			);
+		}
 	}
 
 	let config: TailwindConfig = {};
@@ -108,7 +117,7 @@ export async function createState(
 		classList: undefined,
 		modules: undefined,
 		blocklist: [],
-		editor: createEditorState(cwd),
+		editor: createEditorState(cwd, rootFontSize?.size),
 		features: ["diagnostics"] as unknown as State["features"],
 	};
 
