@@ -116,6 +116,20 @@ describe("CSS Conflict Detection - v4", () => {
 		).toBe(false);
 	});
 
+	it("should lint class strings in code but not the code between strings", async () => {
+		const result = await lint({
+			cwd: testV4Dir,
+			patterns: ["src/class-regex.ts"],
+			autoDiscover: false,
+		});
+
+		const conflicts = result.files[0].diagnostics.filter(
+			(d) => d.code === "cssConflict",
+		);
+
+		expect(conflicts.map((d) => d.range.start.line)).toEqual([6, 6]);
+	});
+
 	it("should report correct line and column numbers for conflicts", async () => {
 		const result = await lint({
 			cwd: testV4Dir,
