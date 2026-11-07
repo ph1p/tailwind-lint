@@ -445,6 +445,11 @@ export const Demo = () =>
 	badge("font-semibold text-[var(--app-text-secondary)]");
 `,
 		);
+		fs.mkdirSync(path.join(tmpDir, ".vscode"), { recursive: true });
+		fs.writeFileSync(
+			path.join(tmpDir, ".vscode", "settings.json"),
+			JSON.stringify({ "tailwindCSS.classFunctions": ["badge"] }),
+		);
 		fs.symlinkSync(
 			path.resolve(__dirname, "fixtures", "v4", "node_modules"),
 			path.join(tmpDir, "node_modules"),
