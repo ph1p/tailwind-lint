@@ -66,7 +66,9 @@ export const SYNTHETIC_VITE_CSS_CONFIG_CONTENT = '@import "tailwindcss";';
 
 export const LANGUAGE_MAP: Record<string, string> = {
 	".astro": "astro",
+	".cjs": "javascript",
 	".css": "css",
+	".cts": "typescript",
 	".erb": "erb",
 	".hbs": "handlebars",
 	".htm": "html",
@@ -76,6 +78,8 @@ export const LANGUAGE_MAP: Record<string, string> = {
 	".less": "less",
 	".md": "markdown",
 	".mdx": "mdx",
+	".mjs": "javascript",
+	".mts": "typescript",
 	".php": "php",
 	".sass": "sass",
 	".scss": "scss",

@@ -28,17 +28,9 @@ export function createEditorState(
 			inspectPort: null,
 			emmetCompletions: false,
 			includeLanguages: {},
-			classAttributes: [
-				"class",
-				"className",
-				"ngClass",
-				"[class]",
-				":class",
-				"v-bind:class",
-				"x-bind:class",
-				"class:list",
-				"classList",
-			],
+			// Language server defaults. Entries are joined into a regex unescaped,
+			// and `[class]` / `:class` forms are already matched for each name.
+			classAttributes: ["class", "className", "ngClass", "class:list"],
 			classFunctions: [],
 			codeActions: true,
 			hovers: true,
@@ -57,15 +49,7 @@ export function createEditorState(
 			},
 			experimental: {
 				configFile: null,
-				classRegex: [
-					// Container consumes every string literal pairwise, so code between a
-					// closing and the next opening quote is never read as a class list.
-					// Strings with ";" are code (e.g. shaders), never a class list.
-					[
-						"(\"(?:[^\"\\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\\n]|\\\\.)*'|`(?:[^`\\\\]|\\\\.)*`)",
-						"^[\"'`]([^\"'`;]*(?:\\b(?:bg|text|border|font|tracking|rounded|px|py|p|m|flex|grid|items|justify|gap|whitespace|overflow|align|leading|uppercase|lowercase|capitalize|shadow|transition)\\b|\\b(?:hover|focus):)[^\"'`;]*)[\"'`]$",
-					],
-				],
+				classRegex: [],
 			},
 			lint: {
 				cssConflict: "warning",

@@ -168,10 +168,14 @@ If a real CSS config is also present, the CLI uses that file so custom `@theme` 
 
 The CLI also reads Tailwind workspace settings from common editor config files so extraction behavior can match your editor more closely.
 
+Class extraction matches the Tailwind language server defaults: class attributes such as `class` and `className` are linted, but plain JS/TS string literals are not. To lint class strings outside attributes, configure `classFunctions` (e.g. `cva`, `cx`) or `experimental.classRegex`.
+
 Supported locations:
 
 - `.zed/settings.json`
 - `.vscode/settings.json`
+
+Other editors' settings (e.g. JetBrains `.idea`) are not read. Whatever editor you use, put shared Tailwind settings in one of the files above so the CLI and CI pick them up.
 
 Supported settings:
 

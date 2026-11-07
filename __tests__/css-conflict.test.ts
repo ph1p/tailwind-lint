@@ -116,18 +116,32 @@ describe("CSS Conflict Detection - v4", () => {
 		).toBe(false);
 	});
 
-	it("should lint class strings in code but not the code between strings", async () => {
+	it("should not lint plain TS strings, identifiers or comments by default", async () => {
 		const result = await lint({
 			cwd: testV4Dir,
-			patterns: ["src/class-regex.ts"],
+			patterns: [
+				"src/class-regex.ts",
+				"src/class-regex-comments.ts",
+				"src/class-attributes.ts",
+				"src/module-comments.mjs",
+			],
+			autoDiscover: false,
+		});
+
+		expect(result.files).toHaveLength(0);
+	});
+
+	it("should lint Vue :class and v-bind:class bindings", async () => {
+		const result = await lint({
+			cwd: testV4Dir,
+			patterns: ["src/vue-bindings.vue"],
 			autoDiscover: false,
 		});
 
 		const conflicts = result.files[0].diagnostics.filter(
 			(d) => d.code === "cssConflict",
 		);
-
-		expect(conflicts.map((d) => d.range.start.line)).toEqual([6, 6]);
+		expect(conflicts.map((d) => d.range.start.line)).toEqual([1, 1, 2, 2]);
 	});
 
 	it("should report correct line and column numbers for conflicts", async () => {
