@@ -46,6 +46,8 @@ export interface LintOptions {
 	verbose?: boolean;
 	/** Root font size in px; overrides editor settings and auto-detection */
 	rootFontSize?: number;
+	/** Number of worker threads, or "auto" for the available CPU parallelism. Defaults to 1. */
+	concurrency?: number | "auto";
 	onProgress?: (current: number, total: number, file: string) => void;
 }
 
