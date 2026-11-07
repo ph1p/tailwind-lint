@@ -26,6 +26,7 @@ interface CliOptions {
 	fix?: boolean;
 	dryRun?: boolean;
 	verbose?: boolean;
+	concurrency?: string;
 	format?: "text" | "json";
 	rootFontSize?: number;
 }
@@ -57,6 +58,12 @@ function resolveOptions(files: string[], options: CliOptions) {
 		dryRun,
 		verbose: options.verbose || false,
 		rootFontSize: options.rootFontSize,
+		concurrency:
+			options.concurrency === "auto"
+				? ("auto" as const)
+				: options.concurrency === undefined
+					? 1
+					: Number(options.concurrency),
 	};
 }
 
@@ -287,6 +294,10 @@ program
 		"Root font size in px for rem conversions (default: auto-detect, else 16)",
 		parseRootFontSize,
 	)
+	.option(
+		"--concurrency <number|auto>",
+		"Worker threads for linting and fixing (default: 1)",
+	)
 	.option("-v, --verbose", "Enable verbose logging for debugging")
 	.option("--format <format>", "Output format: text or json", "text")
 	.addHelpText(
@@ -354,6 +365,7 @@ ${ansis.bold.cyan("Notes:")}
 
 			const results = await lint({
 				...resolved,
+				verbose: resolved.verbose && !isJsonOutput,
 				onProgress: (current, total, file) => {
 					if (showProgress) {
 						process.stdout.write(
