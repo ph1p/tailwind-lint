@@ -37,7 +37,15 @@
 		"LICENSE"
 	],
 	"type": "module",
-	"types": "./dist/linter.d.ts",
+	"main": "./dist/linter.cjs",
+	"types": "./dist/linter.d.cts",
+	"exports": {
+		".": {
+			"types": "./dist/linter.d.cts",
+			"default": "./dist/linter.cjs"
+		},
+		"./package.json": "./package.json"
+	},
 	"publishConfig": {
 		"access": "public",
 		"registry": "https://registry.npmjs.org/"
@@ -61,22 +69,23 @@
 		"@tailwindcss/language-service": "^0.16.0",
 		"ansis": "^4.5.0",
 		"commander": "^15.1.0",
-		"postcss": "^8.5.32",
+		"postcss": "^8.5.33",
 		"tinyglobby": "^0.2.17",
 		"vscode-languageserver-textdocument": "^1.0.16"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.6",
-		"oxfmt": "^0.77.0",
-		"oxlint": "^1.92.0",
+		"oxfmt": "^0.79.0",
+		"oxlint": "^1.94.0",
 		"tsdown": "^0.23.7",
 		"typescript": "^7.0.2",
 		"vitest": "^5.1.0",
-		"vscode-languageserver": "11.0.0"
+		"vscode-languageserver": "11.0.0",
+		"vscode-languageserver-types": "3.18.5"
 	},
 	"engines": {
 		"node": ">=22.0.0",
 		"pnpm": ">=10.0.0"
 	},
-	"packageManager": "pnpm@12.18.0"
+	"packageManager": "pnpm@12.21.0"
 }

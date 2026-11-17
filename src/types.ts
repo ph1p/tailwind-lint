@@ -1,4 +1,4 @@
-import type { Diagnostic } from "vscode-languageserver";
+import type { Diagnostic } from "vscode-languageserver-types";
 
 export interface TailwindConfig {
 	content?: string[] | { files?: string[]; relative?: boolean };
